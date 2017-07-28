@@ -108,7 +108,8 @@ class Frame(QtGui.QWidget):
         self.slider_overlay_opacity.setTickInterval(25)
         self.slider_overlay_opacity.valueChanged.connect(self.on_slider_overlay_opacity)
 
-        self.label_slider_overlay_opacity = QtGui.QLabel(' 50%')
+        value = int(self.overlay_opacity * 100)
+        self.label_slider_overlay_opacity = QtGui.QLabel('{}%'.format(value))  # TODO: fix resize at 100%
 
         layout_slider_label = QtGui.QVBoxLayout()
         layout_slider_label.addWidget(self.slider_overlay_opacity)
@@ -141,6 +142,13 @@ class Frame(QtGui.QWidget):
         # TODO: decide on whether or not to refresh overlay on click
         if self.overlay_active:
             self.update_overlay(self.overlay_image)
+
+        q = self.image_viewer.viewer.qimage
+        w, h = q.width(), q.height()
+
+        ptr = q.bits()
+        ptr.setsize(q.byteCount())
+        arr = np.array(ptr).reshape(h, w, 4)  # Copies the data
 
     def on_button_overlay(self):
         """
@@ -198,7 +206,7 @@ class Frame(QtGui.QWidget):
         value = self.slider_overlay_opacity.value()
         self.overlay_opacity = value / 100.
 
-        self.label_slider_overlay_opacity.setText('{:<3}%'.format(value))
+        self.label_slider_overlay_opacity.setText('{}%'.format(value))
 
         if self.overlay_active:
             self.update_overlay(self.overlay_image)
@@ -249,7 +257,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :param img_data_overlay: image data of overlay
         :param overlay_opacity: transparency of the overlay
         """
-        self.viewer_overlay.setImage(img_data_overlay, opacity=overlay_opacity)
+        self.viewer_overlay.setImage(img_data_overlay, autoLevels=True, opacity=overlay_opacity)
 
 
 if __name__ == '__main__':
