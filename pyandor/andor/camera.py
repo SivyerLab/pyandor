@@ -109,7 +109,7 @@ class Camera(object):
             #     directory=buffer_dir, recording=recording, roi=self.roi)
             raise ValueError
         except ValueError:
-            logger.warn('Error opening the ring buffer. This is expected with a remote camera server.')
+            # logger.warn('Error opening the ring buffer. This is expected with a remote camera server.')
             self.rbuffer = None
         x0 = npr.randint(self.shape[0]/4, self.shape[0]/2)
         y0 = npr.randint(self.shape[1]/4, self.shape[1]/2)

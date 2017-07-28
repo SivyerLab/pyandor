@@ -2,12 +2,12 @@
 
 from __future__ import print_function
 import time
-from queue import Queue
+from Queue import Queue
 import numpy as np
 
 from pyandor.andor.camera import Camera
 from pyandor.andor.log import logger
-from pyqt5 import QtCore
+from PyQt4 import QtCore
 
 
 class CameraThread(QtCore.QThread):
@@ -83,7 +83,9 @@ class CameraThread(QtCore.QThread):
 
             # Acquire data.
             if not self.paused:
+                # print('getting img at {}'.format(time.time()))
                 self.img_data = self.cam.get_image()
                 self.image_signal.emit(self.img_data)
+
             else:
                 time.sleep(0.01)

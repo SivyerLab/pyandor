@@ -120,7 +120,8 @@ class AndorCamera(Camera):
         # Try to load the Andor DLL
         # TODO: library name in Linux?
         # self.clib = ctypes.windll.atmcd32d
-        self.clib = ctypes.windll.atmcd64d
+        # self.clib = ctypes.windll.atmcd64d
+        self.clib = ctypes.WinDLL(r'C:\Users\Alex\PycharmProjects\pyandor\atmcd64d.dll')
 
         # Initialize the camera and get the detector size
         # TODO: directory to Initialize?
@@ -247,7 +248,6 @@ class AndorCamera(Camera):
 
         # Allocate image storage
         img_size = self.shape[0]*self.shape[1]//self.bins**2
-        print(repr(img_size))
         c_array = ctypes.c_long*img_size
         c_img = c_array()
 
@@ -255,8 +255,11 @@ class AndorCamera(Camera):
         if self.trigger_mode == self._trigger_modes['software']:
             self._chk(self.clib.SendSoftwareTrigger())
         self.clib.WaitForAcquisition()
+
         self._chk(self.clib.GetMostRecentImage(
-            ctypes.pointer(c_img), ctypes.c_ulong(img_size)))
+            ctypes.pointer(c_img),
+            ctypes.c_ulong(img_size)
+        ))
 
         # Apply noise filter if requested.
         if self.use_noise_filter:
@@ -344,6 +347,20 @@ class AndorCamera(Camera):
             '\texposure = %.03f\n' % exposure.value +
             '\taccumulate = %.03f\n' % accumulate.value +
             '\tkinetic = %.03f' % kinetic.value)
+
+    def get_exposure_time(self):
+
+        exposure = ctypes.c_float()
+        accumulate = ctypes.c_float()
+        kinetic = ctypes.c_float()
+
+        self.clib.GetAcquisitionTimings(
+            ctypes.pointer(exposure),
+            ctypes.pointer(accumulate),
+            ctypes.pointer(kinetic))
+
+        return exposure.value, accumulate.value, kinetic.value
+
 
     def get_gain(self):
         """Query the current gain settings."""
