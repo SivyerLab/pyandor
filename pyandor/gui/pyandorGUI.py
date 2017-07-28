@@ -31,15 +31,23 @@ class Frame(QtGui.QWidget):
         self.image_viewer = ImageWidget(self)
 
         # top level layout
-        frame_splitter = QtGui.QVBoxLayout()
-        frame_splitter.addWidget(self.image_viewer)
+        layout_frame = QtGui.QVBoxLayout()
 
-        # setup controls
-        control_splitter = self.setup_controls()
+        # layout for overlay transparency
+        layout_slider = self.setup_slider_opacity()
 
-        # set layout and show main frame
-        frame_splitter.addLayout(control_splitter)
-        self.setLayout(frame_splitter)
+        # layout slider next to image viewer
+        layout_viewer_slider = QtGui.QHBoxLayout()
+        layout_viewer_slider.addWidget(self.image_viewer)
+        layout_viewer_slider.addLayout(layout_slider)
+
+        # layout with controls along bottom
+        layout_controls = self.setup_controls()
+
+        # layout and show main frame
+        layout_frame.addLayout(layout_viewer_slider)
+        layout_frame.addLayout(layout_controls)
+        self.setLayout(layout_frame)
         self.show()
 
         # andor camera init
@@ -85,6 +93,28 @@ class Frame(QtGui.QWidget):
         control_splitter.addWidget(self.spinbox_exposure)
 
         return control_splitter
+
+    def setup_slider_opacity(self):
+        """
+        Sets up the slider for opacity
+
+        :return: layout with slider and opacity
+        """
+        self.slider_overlay_opacity = QtGui.QSlider(QtCore.Qt.Vertical)
+        self.slider_overlay_opacity.setMinimum(0)
+        self.slider_overlay_opacity.setMaximum(100)
+        self.slider_overlay_opacity.setValue(50)
+        self.slider_overlay_opacity.setTickPosition(QtGui.QSlider.TicksRight)
+        self.slider_overlay_opacity.setTickInterval(25)
+        self.slider_overlay_opacity.valueChanged.connect(self.on_slider_overlay_opacity)
+
+        self.label_slider_overlay_opacity = QtGui.QLabel(' 50%')
+
+        layout_slider_label = QtGui.QVBoxLayout()
+        layout_slider_label.addWidget(self.slider_overlay_opacity)
+        layout_slider_label.addWidget(self.label_slider_overlay_opacity)
+
+        return layout_slider_label
 
     def update_viewer(self, img_data):
         """
@@ -160,6 +190,18 @@ class Frame(QtGui.QWidget):
         """
         t = self.spinbox_exposure.value()
         self.cam.set_exposure_time(t)
+
+    def on_slider_overlay_opacity(self):
+        """
+        Changes the opacity of the overlay
+        """
+        value = self.slider_overlay_opacity.value()
+        self.overlay_opacity = value / 100.
+
+        self.label_slider_overlay_opacity.setText('{:<3}%'.format(value))
+
+        if self.overlay_active:
+            self.update_overlay(self.overlay_image)
 
     def closeEvent(self, event):
         """
