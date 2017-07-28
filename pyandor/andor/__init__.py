@@ -8,6 +8,7 @@ bugs.
 """
 
 from __future__ import print_function, division
+from os.path import abspath
 import time
 import traceback as tb
 import ctypes
@@ -119,9 +120,9 @@ class AndorCamera(Camera):
 
         # Try to load the Andor DLL
         # TODO: library name in Linux?
-        # self.clib = ctypes.windll.atmcd32d
-        # self.clib = ctypes.windll.atmcd64d
-        self.clib = ctypes.WinDLL(r'C:\Users\Alex\PycharmProjects\pyandor\atmcd64d.dll')
+        # clib_path = abspath(r'..\..\atmcd32d.dll')
+        clib_path = abspath(r'..\..\atmcd64d.dll')
+        self.clib = ctypes.WinDLL(clib_path)
 
         # Initialize the camera and get the detector size
         # TODO: directory to Initialize?
