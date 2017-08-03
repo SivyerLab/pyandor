@@ -18,6 +18,10 @@ The following Python packages are required:
 * numpy
 * pillow
 
+Optionally:
+
+* labjackpython (plus labjack driver, for triggering)
+
 
 Installation
 ------------
