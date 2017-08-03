@@ -46,7 +46,7 @@ class AndorCamera(Camera):
         "accumulate": 2,
         "kinetics": 3,
         "fast kinetics": 4,
-        "continuous": 5}
+        "continuous": 5}  # run till abort
 
     # Valid trigger modes.
     # There are more that are not implemented here, some of which are
@@ -294,10 +294,16 @@ class AndorCamera(Camera):
             sensitive) strings found in self._trigger_modes.
 
         """
-        mode = mode.lower()
+        # mode sometimes passed as int
+        try:
+            mode = mode.lower()
+        except AttributeError:
+            mode = {v: k for k, v in self._trigger_modes.iteritems()}[mode]
+
         if mode not in self._trigger_modes:
             raise AndorError("Invalid trigger mode: " + mode)
         self.trigger_mode = self._trigger_modes[mode]
+
         logger.info("Setting trigger mode to " + mode)
         self._chk(self.clib.SetTriggerMode(self.trigger_mode))
         # if mode == 'external':
