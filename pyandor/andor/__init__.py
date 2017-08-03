@@ -55,6 +55,7 @@ class AndorCamera(Camera):
         "internal": 0,
         "external": 1,
         "external start": 6,
+        "external exposure": 7,
         "software": 10}
 
     def _chk(self, status):
