@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import numpy as np
 import sys, time, logging
 import pyqtgraph as pg
@@ -6,8 +8,16 @@ from PyQt4 import QtGui, QtCore
 from pyandor.andor import AndorCamera, log
 from camthread import CameraThread
 
+global has_u3
+try:
+    import u3
+    has_u3 = True
+except ImportError:
+    has_u3 = False
+
 # show log during dev
 log.setup_logging(level=logging.DEBUG)
+logger = log.logger
 
 
 class Frame(QtGui.QWidget):
@@ -19,21 +29,28 @@ class Frame(QtGui.QWidget):
 
         """
         super(Frame, self).__init__()
-        self.setGeometry(100, 100, 512, 512)
+        self.setGeometry(100, 100, 812, 512)
         self.setWindowTitle('Andor Viewer')
 
         # instance attributes
+        self.playing = True
         self.overlay_image = None
         self.overlay_active = False
         self.overlay_opacity = 0.5
         self.overlay_threshold = 128
         self.do_threshold = False
 
+        self.trigger_mode = 'internal'
+        if has_u3:
+            self.d = u3.U3()
+        else:
+            logger.warn('If want triggering, need labjackpython and driver.')
+
         # init widgets
         self.image_viewer = ImageWidget(self)
 
         # top level layout
-        layout_frame = QtGui.QVBoxLayout()
+        layout_frame = QtGui.QHBoxLayout()
 
         # layout for overlay threshold and opacity
         layout_slider_threshold = self.setup_slider_threshold()
@@ -62,7 +79,7 @@ class Frame(QtGui.QWidget):
 
         # start capturing frames
         self.cam_thread.start()
-        self.cam_thread.unpause()
+        self.cam_thread.unpause()  # TODO: decide if we start playing or paused
 
     def setup_controls(self):
         """
@@ -73,7 +90,7 @@ class Frame(QtGui.QWidget):
         # TODO: factor out into separate class?
 
         # setup controls
-        control_splitter = QtGui.QHBoxLayout()
+        control_splitter = QtGui.QVBoxLayout()
 
         self.checkbox_threshold = QtGui.QCheckBox('Threshold')
         self.checkbox_threshold.stateChanged.connect(self.on_checkbox_threshold)
@@ -87,6 +104,15 @@ class Frame(QtGui.QWidget):
         self.button_start_pause = QtGui.QPushButton('Pause')  # TODO: config with default values
         self.button_start_pause.clicked.connect(self.on_button_start_pause)
 
+        self.button_single = QtGui.QPushButton('Single Exp')
+        self.button_single.clicked.connect(self.on_button_single)
+
+        self.combobox_trigger = QtGui.QComboBox()
+        self.combobox_trigger.addItem('internal')
+        if has_u3:
+            self.combobox_trigger.addItems(['external', 'exposure'])
+        self.combobox_trigger.currentIndexChanged.connect(self.on_combobox_trigger)
+
         self.spinbox_exposure = QtGui.QDoubleSpinBox()
         self.spinbox_exposure.setRange(0, 10000)
         self.spinbox_exposure.setSingleStep(10)
@@ -94,11 +120,19 @@ class Frame(QtGui.QWidget):
         self.spinbox_exposure.setDecimals(1)
         self.spinbox_exposure.valueChanged.connect(self.on_spinbox_exposure)
 
+        if has_u3:
+            self.button_trigger = QtGui.QPushButton('Trigger')
+            self.button_trigger.clicked.connect(self.on_button_trigger)
+
         control_splitter.addWidget(self.checkbox_threshold)
         control_splitter.addWidget(self.button_capture_overlay)
         control_splitter.addWidget(self.button_overlay)
         control_splitter.addWidget(self.button_start_pause)
+        control_splitter.addWidget(self.button_single)
+        control_splitter.addWidget(self.combobox_trigger)
         control_splitter.addWidget(self.spinbox_exposure)
+        if has_u3:
+            control_splitter.addWidget(self.button_trigger)
 
         return control_splitter
 
@@ -155,6 +189,20 @@ class Frame(QtGui.QWidget):
         :param img_data: image data
         """
         self.image_viewer.update(img_data)
+        self.image_viewer.viewer.render()
+        # print(img_data[20][101])
+        #
+        # incomingImage = self.image_viewer.viewer.qimage.convertToFormat(4)
+        #
+        # width = incomingImage.width()
+        # height = incomingImage.height()
+        #
+        # ptr = incomingImage.bits()
+        # ptr.setsize(incomingImage.byteCount())
+        # arr = np.array(ptr).reshape(height, width, 4)
+        #
+        # print(arr[20][101])
+        # print()
 
     def update_overlay(self, img_data_overlay):
         """
@@ -167,11 +215,27 @@ class Frame(QtGui.QWidget):
             threshed[threshed < self.overlay_threshold] = 0
 
             threshed = np.dstack([threshed] * 3)
-            # alpha = np.zeros((threshed.shape[1], threshed.shape[0], 1))
+            alpha = np.zeros((threshed.shape[1], threshed.shape[0], 1))
+            # alpha = np.full((threshed.shape[1], threshed.shape[0], 1), 128, np.uint8)
             # threshed = np.concatenate([threshed, alpha], axis=2)
-            print(threshed[20][101])
+            # print(threshed[20][101])
+            # print(threshed.shape)
 
+            # self.image_viewer.update_overlay(threshed)
             self.image_viewer.update_overlay(threshed, overlay_opacity=self.overlay_opacity)
+            # self.image_viewer.viewer_overlay.render()
+
+            # incomingImage = self.image_viewer.viewer_overlay.qimage.convertToFormat(4)
+            #
+            # width = incomingImage.width()
+            # height = incomingImage.height()
+            #
+            # ptr = incomingImage.bits()
+            # ptr.setsize(incomingImage.byteCount())
+            # arr = np.array(ptr).reshape(height, width, 4)
+            #
+            # print(arr[20][101])
+            # print()
 
         else:
             self.image_viewer.update_overlay(img_data_overlay, overlay_opacity=self.overlay_opacity)
@@ -241,16 +305,62 @@ class Frame(QtGui.QWidget):
         start = 'Start'
         pause = 'Pause'
 
+        # TODO: makes more sense to check attribute or button label?
         if self.button_start_pause.text() == start:
             self.cam_thread.unpause()
+            self.playing = True
             self.button_start_pause.setText(pause)
 
         elif self.button_start_pause.text() == pause:
             self.cam_thread.pause()
+            self.playing = False
             self.button_start_pause.setText(start)
 
         else:
             raise AttributeError('Button has wrong label (should be either {} or {}'.format(start, pause))
+
+    def on_button_single(self):
+        """
+        Captures a single exposure. Must be paused.
+        """
+        if self.playing:
+            logger.warn('Must be paused to acquire single exposure!')
+            return
+
+        self.cam_thread.get_single_image(single_type=self.trigger_mode)
+
+    def send_trigger(self):
+        """
+        Uses labjack to send a short TTL to trigger capture
+        """
+        self.d.setFIOState(4, 1)
+        self.d.setFIOState(4, 0)
+
+    def on_button_trigger(self):
+        """
+        Sends a TTL trigger to capture an expsosure.
+        """
+        if not has_u3:
+            return
+
+        if self.trigger_mode == 'external' and not self.playing:
+            self.send_trigger()
+
+    def on_combobox_trigger(self, idx):
+        """
+        Handles combobox selection for trigger mode
+
+        :param idx: index of combobox selection
+        """
+        selection = str(self.combobox_trigger.currentText())
+
+        trigger_mode_mapping = {
+            'internal': 'internal',
+            'external': 'external',
+            'exposure': 'external exposure',
+            "software": 10}
+
+        self.trigger_mode = trigger_mode_mapping[selection]
 
     def on_spinbox_exposure(self):
         """
