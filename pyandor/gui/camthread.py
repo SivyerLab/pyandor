@@ -40,6 +40,8 @@ class CameraThread(QtCore.QThread):
         self.queue = Queue()
         self.cam = camera
 
+        self.single_type = 'internal'
+
     def stop(self):
         """Stop the thread."""
         self.abort = True
@@ -52,8 +54,9 @@ class CameraThread(QtCore.QThread):
         if self.paused:
             self.queue.put('unpause')
 
-    def get_single_image(self):
+    def get_single_image(self, single_type='internal'):
         if self.paused:
+            self.single_type = single_type
             self.queue.put('single')
         else:
             print(':::::::: No getting a single image while unpaused!')
@@ -79,8 +82,8 @@ class CameraThread(QtCore.QThread):
                     self.cam.stop()
                     mode = self.cam.get_trigger_mode()
                     logger.debug(mode)
-                    # set to internal trigger and get single frame
-                    self.cam.set_trigger_mode('internal')
+                    # set to single type (internal or external trigger) and get single frame
+                    self.cam.set_trigger_mode(self.single_type)
                     self.cam.start()
                     self.img_data = self.cam.get_image()
                     self.image_signal.emit(self.img_data)
