@@ -250,6 +250,8 @@ class Frame(QtGui.QWidget):
         checked = state == QtCore.Qt.Checked
 
         self.image_viewer.flash = checked
+        if self.overlay_active and not checked:
+            self.image_viewer.viewer_overlay.show()
 
     def on_button_capture_overlay(self):
         """
