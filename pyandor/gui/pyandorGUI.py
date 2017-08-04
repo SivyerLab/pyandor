@@ -5,7 +5,6 @@ __email__ = 'tomlinsa@ohsu.edu'
 __version__ = '0.0.1'
 
 import numpy as np
-from scipy.misc import imsave
 import sys, time, logging
 import cv2
 import pyqtgraph as pg
@@ -104,6 +103,9 @@ class Frame(QtGui.QWidget):
         self.checkbox_threshold = QtGui.QCheckBox('Threshold')
         self.checkbox_threshold.stateChanged.connect(self.on_checkbox_threshold)
 
+        self.checkbox_flash = QtGui.QCheckBox('Flash')
+        self.checkbox_flash.stateChanged.connect(self.on_checkbox_flash)
+
         self.button_capture_overlay = QtGui.QPushButton('Capture Overlay')
         self.button_capture_overlay.clicked.connect(self.on_button_capture_overlay)
 
@@ -134,6 +136,7 @@ class Frame(QtGui.QWidget):
             self.button_trigger.clicked.connect(self.on_button_trigger)
 
         control_splitter.addWidget(self.checkbox_threshold)
+        control_splitter.addWidget(self.checkbox_flash)
         control_splitter.addWidget(self.button_start_pause)
         control_splitter.addWidget(self.button_capture_overlay)
         control_splitter.addWidget(self.button_overlay)
@@ -240,26 +243,23 @@ class Frame(QtGui.QWidget):
         if self.overlay_active:
             self.update_overlay(self.overlay_image)
 
+    def on_checkbox_flash(self, state):
+        """
+        Updates whether or not to flash overlay
+        """
+        checked = state == QtCore.Qt.Checked
+
+        self.image_viewer.flash = checked
+
     def on_button_capture_overlay(self):
         """
         Captures the current image to display as overlay.
         """
-        # self.overlay_image = self.image_viewer.viewer.image
-
-        # capture image as qimage
-        # qimage = self.image_viewer.viewer.qimage
-        # w, h = qimage.width(), qimage.height()
-        #
-        # ptr = qimage.bits()
-        # ptr.setsize(qimage.byteCount())
-        # arr = np.array(ptr).reshape(h, w, 4)  # Copies the data
-        # self.overlay_image = np.fliplr(np.rot90(arr, -1))
-
         data = self.image_viewer.viewer.image
         min, max = data.min(), data.max()
+        # rescale to 255 to allow threshold slider
         self.overlay_image = pg.functions.rescaleData(data, 255. / (max - min), min, dtype=np.uint8)
 
-        # TODO: decide on whether or not to refresh overlay on click
         if self.overlay_active:
             self.update_overlay(self.overlay_image)
 
@@ -372,7 +372,7 @@ class Frame(QtGui.QWidget):
         Changes the opacity of the overlay
         """
         value = self.slider_overlay_opacity.value()
-        self.overlay_opacity = value / 100.
+        self.overlay_opacity = 1 - value / 100.
 
         self.label_slider_overlay_opacity.setText('{}%'.format(value))
 
@@ -408,11 +408,14 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
     """
     def __init__(self, parent=None):
         super(ImageWidget, self).__init__(parent=parent)
+        self.parent = parent
 
         vb = self.addViewBox(row=1, col=1)
 
         self.viewer = pg.ImageItem()
         self.viewer_overlay = pg.ImageItem()
+
+        self.flash = False
 
         vb.addItem(self.viewer)
         vb.addItem(self.viewer_overlay)
@@ -421,6 +424,11 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         self.viewer_overlay.setZValue(1)
 
         vb.setAspectLocked(True)
+
+        # timer for flashing overaly
+        self.flash_timer = QtCore.QTimer(self)
+        self.flash_timer.timeout.connect(self.flash_overlay)
+        self.flash_timer.start(500)
 
     def update(self, img_data):
         """
@@ -441,6 +449,17 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
             self.viewer_overlay.setImage(img_data_overlay, autoLevels=True, opacity=overlay_opacity)
         else:
             self.viewer_overlay.setImage(img_data_overlay, autoLevels=True)
+
+    def flash_overlay(self):
+        """
+        Toggles overlay if active for flashing effect
+        """
+        if self.parent.overlay_active and self.flash:
+            if self.viewer_overlay.isVisible():
+                self.viewer_overlay.hide()
+            else:
+                self.viewer_overlay.show()
+
 
 
 if __name__ == '__main__':
