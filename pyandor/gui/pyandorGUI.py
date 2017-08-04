@@ -1,6 +1,11 @@
 from __future__ import print_function, division
 
+__author__ = 'Alexander Tomlinson'
+__email__ = 'tomlinsa@ohsu.edu'
+__version__ = '0.0.1'
+
 import numpy as np
+from scipy.misc import imsave
 import sys, time, logging
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
@@ -29,7 +34,7 @@ class Frame(QtGui.QWidget):
 
         """
         super(Frame, self).__init__()
-        self.setGeometry(100, 100, 812, 512)
+        self.setGeometry(100, 100, 750, 600)
         self.setWindowTitle('Andor Viewer')
 
         # instance attributes
@@ -39,6 +44,7 @@ class Frame(QtGui.QWidget):
         self.overlay_opacity = 0.5
         self.overlay_threshold = 128
         self.do_threshold = False
+        self.threshed = np.empty((1024, 1024, 4), dtype=np.uint8)
 
         self.trigger_mode = 'internal'
         if has_u3:
@@ -104,7 +110,7 @@ class Frame(QtGui.QWidget):
         self.button_start_pause = QtGui.QPushButton('Pause')  # TODO: config with default values
         self.button_start_pause.clicked.connect(self.on_button_start_pause)
 
-        self.button_single = QtGui.QPushButton('Single Exp')
+        self.button_single = QtGui.QPushButton('Single Exposure')
         self.button_single.clicked.connect(self.on_button_single)
 
         self.combobox_trigger = QtGui.QComboBox()
@@ -125,15 +131,16 @@ class Frame(QtGui.QWidget):
             self.button_trigger.clicked.connect(self.on_button_trigger)
 
         control_splitter.addWidget(self.checkbox_threshold)
+        control_splitter.addWidget(self.button_start_pause)
         control_splitter.addWidget(self.button_capture_overlay)
         control_splitter.addWidget(self.button_overlay)
-        control_splitter.addWidget(self.button_start_pause)
-        control_splitter.addWidget(self.button_single)
         control_splitter.addWidget(self.combobox_trigger)
-        control_splitter.addWidget(self.spinbox_exposure)
+        control_splitter.addWidget(self.button_single)
         if has_u3:
             control_splitter.addWidget(self.button_trigger)
+        control_splitter.addWidget(self.spinbox_exposure)
 
+        control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
 
     def setup_slider_threshold(self):
@@ -210,32 +217,15 @@ class Frame(QtGui.QWidget):
 
         :param img_data_overlay: image data of the overlay
         """
+
         if self.do_threshold:
-            threshed = np.copy(img_data_overlay)
-            threshed[threshed < self.overlay_threshold] = 0
+            mask = img_data_overlay > self.overlay_threshold
+            w, h = mask.shape
 
-            threshed = np.dstack([threshed] * 3)
-            alpha = np.zeros((threshed.shape[1], threshed.shape[0], 1))
-            # alpha = np.full((threshed.shape[1], threshed.shape[0], 1), 128, np.uint8)
-            # threshed = np.concatenate([threshed, alpha], axis=2)
-            # print(threshed[20][101])
-            # print(threshed.shape)
+            self.threshed[:] = 0
+            self.threshed[mask] = [255, 0, 0, 255]
 
-            # self.image_viewer.update_overlay(threshed)
-            self.image_viewer.update_overlay(threshed, overlay_opacity=self.overlay_opacity)
-            # self.image_viewer.viewer_overlay.render()
-
-            # incomingImage = self.image_viewer.viewer_overlay.qimage.convertToFormat(4)
-            #
-            # width = incomingImage.width()
-            # height = incomingImage.height()
-            #
-            # ptr = incomingImage.bits()
-            # ptr.setsize(incomingImage.byteCount())
-            # arr = np.array(ptr).reshape(height, width, 4)
-            #
-            # print(arr[20][101])
-            # print()
+            self.image_viewer.update_overlay(self.threshed, overlay_opacity=self.overlay_opacity)
 
         else:
             self.image_viewer.update_overlay(img_data_overlay, overlay_opacity=self.overlay_opacity)
@@ -329,11 +319,13 @@ class Frame(QtGui.QWidget):
 
         self.cam_thread.get_single_image(single_type=self.trigger_mode)
 
-    def send_trigger(self):
+    def send_trigger(self, t=None):
         """
         Uses labjack to send a short TTL to trigger capture
         """
         self.d.setFIOState(4, 1)
+        if t is not None:
+            time.sleep(t)
         self.d.setFIOState(4, 0)
 
     def on_button_trigger(self):
@@ -345,6 +337,13 @@ class Frame(QtGui.QWidget):
 
         if self.trigger_mode == 'external' and not self.playing:
             self.send_trigger()
+
+        if not self.playing:
+            if self.trigger_mode == 'external':
+                self.send_trigger()
+
+            if self.trigger_mode == 'external exposure':
+                self.send_trigger(t=0.2)
 
     def on_combobox_trigger(self, idx):
         """
@@ -358,7 +357,7 @@ class Frame(QtGui.QWidget):
             'internal': 'internal',
             'external': 'external',
             'exposure': 'external exposure',
-            "software": 10}
+            'software': 'software'}
 
         self.trigger_mode = trigger_mode_mapping[selection]
 
