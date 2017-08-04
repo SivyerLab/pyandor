@@ -7,6 +7,7 @@ __version__ = '0.0.1'
 import numpy as np
 from scipy.misc import imsave
 import sys, time, logging
+import cv2
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 
@@ -44,7 +45,9 @@ class Frame(QtGui.QWidget):
         self.overlay_opacity = 0.5
         self.overlay_threshold = 128
         self.do_threshold = False
-        self.threshed = np.empty((1024, 1024, 4), dtype=np.uint8)
+
+        self.z = np.zeros((1024, 1024), dtype=np.uint8)
+        self.noise_kernel = np.ones((3, 3), np.uint8)
 
         self.trigger_mode = 'internal'
         if has_u3:
@@ -197,19 +200,6 @@ class Frame(QtGui.QWidget):
         """
         self.image_viewer.update(img_data)
         self.image_viewer.viewer.render()
-        # print(img_data[20][101])
-        #
-        # incomingImage = self.image_viewer.viewer.qimage.convertToFormat(4)
-        #
-        # width = incomingImage.width()
-        # height = incomingImage.height()
-        #
-        # ptr = incomingImage.bits()
-        # ptr.setsize(incomingImage.byteCount())
-        # arr = np.array(ptr).reshape(height, width, 4)
-        #
-        # print(arr[20][101])
-        # print()
 
     def update_overlay(self, img_data_overlay):
         """
@@ -217,18 +207,27 @@ class Frame(QtGui.QWidget):
 
         :param img_data_overlay: image data of the overlay
         """
-
         if self.do_threshold:
-            mask = img_data_overlay > self.overlay_threshold
-            w, h = mask.shape
-
-            self.threshed[:] = 0
-            self.threshed[mask] = [255, 0, 0, 255]
-
+            self.threshold_overlay(img_data_overlay)
             self.image_viewer.update_overlay(self.threshed, overlay_opacity=self.overlay_opacity)
 
         else:
             self.image_viewer.update_overlay(img_data_overlay, overlay_opacity=self.overlay_opacity)
+
+    def threshold_overlay(self, img):
+        """
+        Handles the processing to threshold the overlay
+
+        :param img: passed image
+        :return: thresholded overlay image
+        """
+        _, mask = cv2.threshold(img, self.overlay_threshold, 255, cv2.THRESH_BINARY)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.noise_kernel, iterations=5)
+
+        self.threshed = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+        b_channel, g_channel, r_channel = cv2.split(self.threshed)
+        self.threshed = cv2.merge((r_channel, self.z, self.z, mask))
 
     def on_checkbox_threshold(self, state):
         """
