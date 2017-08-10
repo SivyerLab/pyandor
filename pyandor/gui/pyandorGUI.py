@@ -415,15 +415,15 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         if img_data is not None:
             img_data = self.rescale_image(img_data)
-            self.viewer.setImage(img_data, autoLevels=True)
+            self.viewer.setImage(img_data)
 
         if self.parent.overlay_active:
             if self.do_threshold:
                 threshed = self.threshold_overlay(self.overlay_image, self.thresh_value)
-                self.viewer_overlay.setImage(threshed, autoLevels=True, opacity=self.overlay_opacity)
+                self.viewer_overlay.setImage(threshed, opacity=self.overlay_opacity)
 
             else:
-                self.viewer_overlay.setImage(self.overlay_image, autoLevels=True, opacity=self.overlay_opacity)
+                self.viewer_overlay.setImage(self.overlay_image, opacity=self.overlay_opacity)
 
     def threshold_overlay(self, img, thresh_value):
         """
