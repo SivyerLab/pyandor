@@ -414,6 +414,8 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         :param img_data: image data
         """
+        img_data = self.rescale_image(img_data)
+
         self.viewer.setImage(img_data, autoLevels=True)
 
     def update_overlay(self, overlay_opacity=None, threshold=False, thresh_value=None):
@@ -447,17 +449,27 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         b_channel, g_channel, r_channel = cv2.split(threshed)
 
-        return cv2.merge((r_channel, self.z, self.z, mask))
+        return cv2.merge((self.z, self.z, b_channel, mask))
 
     def capture_overlay(self):
         """
         Captures the current image to display as overlay.
         """
         data = self.viewer.image
-        min, max = data.min(), data.max()
 
         # rescale to 255 to allow threshold slider
-        self.overlay_image = pg.functions.rescaleData(data, 255. / (max - min), min, dtype=np.uint8)
+        self.overlay_image = self.rescale_image(data)
+
+    def rescale_image(self, img):
+        """
+        Rescales image into 0-255
+
+        :param img: 2-D array
+        :return: 2-D numpy array scaled to 0-255
+        """
+        img_min, img_max = img.min(), img.max()
+
+        return pg.functions.rescaleData(img, 255. / (img_max - img_min), img_min, dtype=np.uint8)
 
     def flash_overlay(self):
         """
