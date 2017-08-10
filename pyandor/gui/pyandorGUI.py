@@ -31,7 +31,9 @@ class Frame(QtGui.QWidget):
     """
     def __init__(self):
         """
+        init
 
+        TODO: write ini
         """
         super(Frame, self).__init__()
         self.setGeometry(100, 100, 750, 600)
@@ -78,8 +80,9 @@ class Frame(QtGui.QWidget):
         # andor camera init
         self.cam = AndorCamera()
         self.cam.update_exposure_time(16)
+
         self.cam_thread = CameraThread(self.cam)
-        self.cam_thread.image_signal.connect(self.update_viewer)
+        self.cam_thread.image_signal.connect(self.image_viewer.update)
 
         # start capturing frames
         self.cam_thread.start()
@@ -190,15 +193,6 @@ class Frame(QtGui.QWidget):
         layout_slider_label.addWidget(self.label_slider_overlay_opacity)
 
         return layout_slider_label
-
-    def update_viewer(self, img_data):
-        """
-        Makes call to update image viewer with transparency params.
-
-        :param img_data: image data
-        """
-        self.image_viewer.update(img_data)
-        self.image_viewer.viewer.render()
 
     def update_overlay(self):
         """
