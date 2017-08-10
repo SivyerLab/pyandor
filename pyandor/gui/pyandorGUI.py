@@ -45,9 +45,6 @@ class Frame(QtGui.QWidget):
         self.overlay_threshold = 128
         self.do_threshold = False
 
-        self.z = np.zeros((1024, 1024), dtype=np.uint8)
-        self.noise_kernel = np.ones((3, 3), np.uint8)
-
         self.trigger_mode = 'internal'
         if has_u3:
             self.d = u3.U3()
@@ -210,27 +207,10 @@ class Frame(QtGui.QWidget):
 
         :param img_data_overlay: image data of the overlay
         """
-        if self.do_threshold:
-            self.threshold_overlay(img_data_overlay)
-            self.image_viewer.update_overlay(self.threshed, overlay_opacity=self.overlay_opacity)
-
-        else:
-            self.image_viewer.update_overlay(img_data_overlay, overlay_opacity=self.overlay_opacity)
-
-    def threshold_overlay(self, img):
-        """
-        Handles the processing to threshold the overlay
-
-        :param img: passed image
-        :return: thresholded overlay image
-        """
-        _, mask = cv2.threshold(img, self.overlay_threshold, 255, cv2.THRESH_BINARY)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.noise_kernel, iterations=5)
-
-        self.threshed = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-
-        b_channel, g_channel, r_channel = cv2.split(self.threshed)
-        self.threshed = cv2.merge((r_channel, self.z, self.z, mask))
+        self.image_viewer.update_overlay(img_data_overlay,
+                                         overlay_opacity=self.overlay_opacity,
+                                         threshold=self.do_threshold,
+                                         thresh_value=self.overlay_threshold)
 
     def on_checkbox_threshold(self, state):
         """
@@ -432,6 +412,10 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         self.flash_timer.timeout.connect(self.flash_overlay)
         self.flash_timer.start(500)
 
+        # thresholding stuff
+        self.z = np.zeros((1024, 1024), dtype=np.uint8)
+        self.noise_kernel = np.ones((3, 3), np.uint8)
+
     def update(self, img_data):
         """
         Updates image
@@ -440,17 +424,39 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         self.viewer.setImage(img_data, autoLevels=True)
 
-    def update_overlay(self, img_data_overlay, overlay_opacity=None):
+    def update_overlay(self, img_data_overlay, overlay_opacity=None, threshold=False, thresh_value=None):
         """
         Updates overlay data
 
         :param img_data_overlay: image data of overlay
         :param overlay_opacity: transparency of the overlay
+        :param threshold: whether or not to threshold image
+        :param thresh_value: if thresholding, threshold lower cutoff
         """
+        if threshold:
+            img_data_overlay = self.threshold_overlay(img_data_overlay, thresh_value)
+
         if overlay_opacity is not None:
             self.viewer_overlay.setImage(img_data_overlay, autoLevels=True, opacity=overlay_opacity)
         else:
             self.viewer_overlay.setImage(img_data_overlay, autoLevels=True)
+
+    def threshold_overlay(self, img, thresh_value):
+        """
+        Handles the processing to threshold the overlay
+
+        :param img: passed image
+        :param thresh_value: thresholding lower cutoff
+        :return: thresholded overlay image
+        """
+        _, mask = cv2.threshold(img, thresh_value, 255, cv2.THRESH_BINARY)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.noise_kernel, iterations=5)
+
+        threshed = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+        b_channel, g_channel, r_channel = cv2.split(threshed)
+
+        return cv2.merge((r_channel, self.z, self.z, mask))
 
     def flash_overlay(self):
         """
