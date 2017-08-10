@@ -432,12 +432,11 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :param thresh_value: if thresholding, threshold lower cutoff
         """
         if threshold:
-            self.overlay_image = self.threshold_overlay(self.overlay_image, thresh_value)
+            threshed = self.threshold_overlay(self.overlay_image, thresh_value)
+            self.viewer_overlay.setImage(threshed, autoLevels=True, opacity=overlay_opacity)
 
-        if overlay_opacity is not None:
-            self.viewer_overlay.setImage(self.overlay_image, autoLevels=True, opacity=overlay_opacity)
         else:
-            self.viewer_overlay.setImage(self.overlay_image, autoLevels=True)
+            self.viewer_overlay.setImage(self.overlay_image, autoLevels=True, opacity=overlay_opacity)
 
     def threshold_overlay(self, img, thresh_value):
         """
