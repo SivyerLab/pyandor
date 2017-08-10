@@ -39,7 +39,6 @@ class Frame(QtGui.QWidget):
 
         # instance attributes
         self.playing = True
-        self.overlay_image = None
         self.overlay_active = False
         self.overlay_opacity = 0.5
         self.overlay_threshold = 128
@@ -201,14 +200,13 @@ class Frame(QtGui.QWidget):
         self.image_viewer.update(img_data)
         self.image_viewer.viewer.render()
 
-    def update_overlay(self, img_data_overlay):
+    def update_overlay(self):
         """
         Updates the overlay.
 
         :param img_data_overlay: image data of the overlay
         """
-        self.image_viewer.update_overlay(img_data_overlay,
-                                         overlay_opacity=self.overlay_opacity,
+        self.image_viewer.update_overlay(overlay_opacity=self.overlay_opacity,
                                          threshold=self.do_threshold,
                                          thresh_value=self.overlay_threshold)
 
@@ -221,7 +219,7 @@ class Frame(QtGui.QWidget):
         self.do_threshold = checked
 
         if self.overlay_active:
-            self.update_overlay(self.overlay_image)
+            self.update_overlay()
 
     def on_checkbox_flash(self, state):
         """
@@ -237,13 +235,10 @@ class Frame(QtGui.QWidget):
         """
         Captures the current image to display as overlay.
         """
-        data = self.image_viewer.viewer.image
-        min, max = data.min(), data.max()
-        # rescale to 255 to allow threshold slider
-        self.overlay_image = pg.functions.rescaleData(data, 255. / (max - min), min, dtype=np.uint8)
+        self.image_viewer.capture_overlay()
 
         if self.overlay_active:
-            self.update_overlay(self.overlay_image)
+            self.update_overlay()
 
     def on_button_overlay(self):
         """
@@ -253,10 +248,10 @@ class Frame(QtGui.QWidget):
         off = 'Hide Overlay'
 
         if self.button_overlay.text() == on:
-            if self.overlay_image is None:
+            if self.image_viewer.overlay_image is None:
                 self.on_button_capture_overlay()
 
-            self.update_overlay(self.overlay_image)
+            self.update_overlay()
             self.overlay_active = True
             self.image_viewer.viewer_overlay.show()
             self.button_overlay.setText(off)
@@ -359,7 +354,7 @@ class Frame(QtGui.QWidget):
         self.label_slider_overlay_opacity.setText('{}%'.format(value))
 
         if self.overlay_active:
-            self.update_overlay(self.overlay_image)
+            self.update_overlay()
 
     def on_slider_overlay_threshold(self):
         """
@@ -371,7 +366,7 @@ class Frame(QtGui.QWidget):
         self.label_slider_overlay_threshold.setText('{}'.format(value))
 
         if self.overlay_active:
-            self.update_overlay(self.overlay_image)
+            self.update_overlay()
 
     def closeEvent(self, event):
         """
@@ -396,12 +391,15 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         self.viewer = pg.ImageItem()
         self.viewer_overlay = pg.ImageItem()
+        # overlay image container
+        self.overlay_image = None
 
         self.flash = False
 
         vb.addItem(self.viewer)
         vb.addItem(self.viewer_overlay)
         self.viewer_overlay.hide()
+
         # set overlay to always be on top
         self.viewer_overlay.setZValue(1)
 
@@ -424,7 +422,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         self.viewer.setImage(img_data, autoLevels=True)
 
-    def update_overlay(self, img_data_overlay, overlay_opacity=None, threshold=False, thresh_value=None):
+    def update_overlay(self, overlay_opacity=None, threshold=False, thresh_value=None):
         """
         Updates overlay data
 
@@ -434,12 +432,12 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :param thresh_value: if thresholding, threshold lower cutoff
         """
         if threshold:
-            img_data_overlay = self.threshold_overlay(img_data_overlay, thresh_value)
+            self.overlay_image = self.threshold_overlay(self.overlay_image, thresh_value)
 
         if overlay_opacity is not None:
-            self.viewer_overlay.setImage(img_data_overlay, autoLevels=True, opacity=overlay_opacity)
+            self.viewer_overlay.setImage(self.overlay_image, autoLevels=True, opacity=overlay_opacity)
         else:
-            self.viewer_overlay.setImage(img_data_overlay, autoLevels=True)
+            self.viewer_overlay.setImage(self.overlay_image, autoLevels=True)
 
     def threshold_overlay(self, img, thresh_value):
         """
@@ -457,6 +455,16 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         b_channel, g_channel, r_channel = cv2.split(threshed)
 
         return cv2.merge((r_channel, self.z, self.z, mask))
+
+    def capture_overlay(self):
+        """
+        Captures the current image to display as overlay.
+        """
+        data = self.viewer.image
+        min, max = data.min(), data.max()
+
+        # rescale to 255 to allow threshold slider
+        self.overlay_image = pg.functions.rescaleData(data, 255. / (max - min), min, dtype=np.uint8)
 
     def flash_overlay(self):
         """
