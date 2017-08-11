@@ -43,10 +43,23 @@ class Frame(QtGui.QMainWindow):
         self.setGeometry(100, 100, 750, 600)
         self.setWindowTitle('Andor Viewer')
 
+        self.statusbar = self.create_status_bar()
+
         # init central widghet
         self.main_widget = CentralWidget(self)
+
         self.setCentralWidget(self.main_widget)
         self.show()
+
+    def create_status_bar(self):
+        """
+        Creates the status bar
+        """
+        statusbar = QtGui.QStatusBar()
+        statusbar.setSizeGripEnabled(False)
+        self.setStatusBar(statusbar)
+        statusbar.showMessage('Welcome', 2000)
+        return statusbar
 
     def closeEvent(self, event):
         """
@@ -92,6 +105,9 @@ class CentralWidget(QtGui.QWidget):
         layout_slider_threshold = self.setup_slider_threshold()
         layout_slider_opacity = self.setup_slider_opacity()
 
+        # setup status bar labels
+        self.setup_status_bar()
+
         # layout sliders on either side of image viewer
         layout_viewer_slider = QtGui.QHBoxLayout()
         layout_viewer_slider.addLayout(layout_slider_threshold)
@@ -117,8 +133,6 @@ class CentralWidget(QtGui.QWidget):
         self.cam_thread.start()
         self.cam_thread.unpause()  # TODO: decide if we start playing or paused
 
-        # self.create_status_bar()
-
     def setup_controls(self):
         """
         Sets up the controls for the frame
@@ -135,6 +149,9 @@ class CentralWidget(QtGui.QWidget):
 
         self.checkbox_flash = QtGui.QCheckBox('Flash')
         self.checkbox_flash.stateChanged.connect(self.on_checkbox_flash)
+
+        self.checkbox_record = QtGui.QCheckBox('Record')
+        self.checkbox_record.stateChanged.connect(self.on_checkbox_record)
 
         self.button_capture_overlay = QtGui.QPushButton('Capture Overlay')
         self.button_capture_overlay.clicked.connect(self.on_button_capture_overlay)
@@ -174,6 +191,7 @@ class CentralWidget(QtGui.QWidget):
 
         control_splitter.addWidget(self.checkbox_threshold)
         control_splitter.addWidget(self.checkbox_flash)
+        control_splitter.addWidget(self.checkbox_record)
         control_splitter.addWidget(self.button_start_pause)
         control_splitter.addWidget(self.button_capture_overlay)
         control_splitter.addWidget(self.button_overlay)
@@ -233,12 +251,18 @@ class CentralWidget(QtGui.QWidget):
 
         return layout_slider_label
 
-    def create_status_bar(self):
+    def setup_status_bar(self):
         """
-        Creates the status bar
+        Sets up the permanent labels in the status bar
         """
-        self.statusbar = QtGui.QStatusBar()
-        self.setStatusBar(self.statusbar)
+        self.status_playing = QtGui.QLabel('Playing')
+        self.frame.statusbar.addPermanentWidget(self.status_playing)
+
+        self.status_overlay = QtGui.QLabel('No overlay')
+        self.frame.statusbar.addPermanentWidget(self.status_overlay)
+
+        self.status_exposure = QtGui.QLabel('Exposure: {:.2f} ms'.format(16))
+        self.frame.statusbar.addPermanentWidget(self.status_exposure)
 
     def update_overlay(self):
         """
@@ -269,6 +293,19 @@ class CentralWidget(QtGui.QWidget):
         if self.overlay_active and not checked:
             self.image_viewer.viewer_overlay.show()
 
+    def on_checkbox_record(self, state):
+        """
+        Updates whether or not to flash overlay
+        """
+        checked = state == QtCore.Qt.Checked
+
+        self.image_viewer.to_out = checked
+
+        if checked:
+            self.image_viewer.init_out()
+        else:
+            self.image_viewer.release_out()
+
     def on_button_capture_overlay(self):
         """
         Captures the current image to display as overlay.
@@ -277,6 +314,8 @@ class CentralWidget(QtGui.QWidget):
 
         if self.overlay_active:
             self.update_overlay()
+        else:
+            self.status_overlay.setText('Overlay Stored')
 
     def on_button_overlay(self):
         """
@@ -293,11 +332,13 @@ class CentralWidget(QtGui.QWidget):
             self.overlay_active = True
             self.image_viewer.viewer_overlay.show()
             self.button_overlay.setText(off)
+            self.status_overlay.setText('Overlay Active')
 
         elif self.button_overlay.text() == off:
             self.overlay_active = False
             self.image_viewer.viewer_overlay.hide()
             self.button_overlay.setText(on)
+            self.status_overlay.setText('Overlay Stored')
 
         else:
             raise AttributeError('Button has wrong label (should be either {} or {}'.format(on, off))
@@ -313,11 +354,13 @@ class CentralWidget(QtGui.QWidget):
         if self.button_start_pause.text() == start:
             self.cam_thread.unpause()
             self.playing = True
+            self.status_playing.setText('Playing')
             self.button_start_pause.setText(pause)
 
         elif self.button_start_pause.text() == pause:
             self.cam_thread.pause()
             self.playing = False
+            self.status_playing.setText('Paused')
             self.button_start_pause.setText(start)
 
         else:
@@ -381,6 +424,7 @@ class CentralWidget(QtGui.QWidget):
         """
         t = self.spinbox_exposure.value()
         e, a, k = self.cam.set_exposure_time(t)
+        self.status_exposure.setText('Exposure: {:.2f} ms'.format(e * 1000))
 
     def on_spinbox_bins(self):
         """
@@ -469,6 +513,8 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         self.thresh_value = 128
 
         self.flash = False
+        self.out = None
+        self.to_out = False
 
         vb.addItem(self.viewer)
         vb.addItem(self.viewer_overlay)
@@ -486,7 +532,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         # thresholding stuff
         self.z = None
-        self.noise_kernel = np.ones((1, 1), np.uint8)
+        self.noise_kernel = np.ones((3, 3), np.uint8)
 
     def update(self, img_data=None):
         """
@@ -497,6 +543,8 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         if img_data is not None:
             img_data = self.rescale_image(img_data)
             self.viewer.setImage(img_data)
+            if self.to_out:
+                self.write_out(img_data)
 
         if self.parent.overlay_active:
             if self.do_threshold:
@@ -522,7 +570,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :return: thresholded overlay image
         """
         _, mask = cv2.threshold(img, thresh_value, 255, cv2.THRESH_BINARY)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.noise_kernel, iterations=5)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.noise_kernel, iterations=3)
 
         threshed = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
@@ -561,6 +609,49 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
                 self.viewer_overlay.hide()
             else:
                 self.viewer_overlay.show()
+
+    def init_out(self, path=None):
+        """
+        Creates out object to write video to file.
+
+        :param path: file save path
+        """
+        if path is None:
+            path = 'test_out.mov'
+
+        if self.out is None:
+            self.out = cv2.VideoWriter(path,
+                                       fourcc=cv2.cv.CV_FOURCC(*'XVID'),
+                                       fps=60,
+                                       frameSize=(1024, 1024))
+
+        else:
+            raise IOError('VideoWriter already created. Release first.')
+
+    def write_out(self, frame):
+        """
+        Writes frames to file.
+        """
+        if self.out is not None:
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+            self.out.write(frame)
+            print('writing')
+
+        else:
+            raise IOError('VideoWriter not created. Nothing with which to '
+                          'write.')
+
+    def release_out(self):
+        """
+        Releases out object.
+        """
+        if self.out is not None:
+            self.out.release()
+            self.out = None
+            logger.info('Recording saved.')
+
+        else:
+            raise IOError('VideoWriter not created. Nothing to release.')
 
 
 

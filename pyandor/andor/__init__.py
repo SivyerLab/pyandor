@@ -137,8 +137,7 @@ class AndorCamera(Camera):
         self.shape = [xpx.contents.value, ypx.contents.value]
         # self._chk(self.clib.SetReadMode(4)) # image read mode
         self.set_crop([1, self.shape[0], 1, self.shape[1]])
-        self.set_bins(2)
-        # self.set_bins(1)
+        self.set_bins(1)
         self.use_noise_filter = kwargs.get('use_noise_filter', False)
         self.wait_for_temp = kwargs.get('wait_for_temp', True)
 
@@ -357,7 +356,7 @@ class AndorCamera(Camera):
             ctypes.pointer(kinetic))
         logger.debug(
             'Results of GetAcquisitionTimings:\n' +
-            '\texposure = %.03f\n' % exposure.value +
+            '\texposure = %.03f\n' % (exposure.value * 1000) +
             '\taccumulate = %.03f\n' % accumulate.value +
             '\tkinetic = %.03f' % kinetic.value)
 
