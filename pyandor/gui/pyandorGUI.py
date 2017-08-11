@@ -11,6 +11,7 @@ import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 
 from pyandor.andor import AndorCamera
+from pyandor.andor import AndorError, AndorAcqInProgress
 from pyandor.andor.log import logger
 from camthread import CameraThread
 
@@ -340,7 +341,7 @@ class Frame(QtGui.QWidget):
         Changes the exposure time of the camera (in ms)
         """
         t = self.spinbox_exposure.value()
-        self.cam.set_exposure_time(t)
+        e, a, k = self.cam.set_exposure_time(t)
 
     def on_spinbox_bins(self):
         """
@@ -349,10 +350,19 @@ class Frame(QtGui.QWidget):
         b = int(self.spinbox_bins.value())
 
         self.cam_thread.pause()
-        time.sleep(.1)
-        self.cam.set_bins(b)
+        time.sleep(.3)
+
+        # sometimes doesn't pause in time if rapid switch
+        try:
+            self.cam.set_bins(b)
+        except AndorAcqInProgress:
+            raise
+
         time.sleep(.1)
         self.cam_thread.unpause()
+        # need to wait for unpause, in case try to change binning again
+        while self.cam_thread.paused:
+            pass
 
     def on_slider_overlay_opacity(self):
         """
@@ -433,7 +443,6 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         :param img_data: image data, if None only updates overlay
         """
-
         if img_data is not None:
             img_data = self.rescale_image(img_data)
             self.viewer.setImage(img_data)
