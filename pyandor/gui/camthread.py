@@ -70,12 +70,12 @@ class CameraThread(QtCore.QThread):
                 msg = self.queue.get()
 
                 if msg == 'pause':
-                    self.paused = True
                     self.cam.stop()
+                    self.paused = True
 
                 elif msg == 'unpause':
-                    self.paused = False
                     self.cam.start()
+                    self.paused = False
 
                 elif msg == 'single':
                     # ensure stopped
