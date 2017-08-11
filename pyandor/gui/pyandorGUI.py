@@ -128,6 +128,13 @@ class Frame(QtGui.QWidget):
         self.spinbox_exposure.setDecimals(1)
         self.spinbox_exposure.valueChanged.connect(self.on_spinbox_exposure)
 
+        self.spinbox_bins = QtGui.QDoubleSpinBox()
+        self.spinbox_bins.setRange(1, 16)
+        self.spinbox_bins.setSingleStep(1)
+        self.spinbox_bins.setValue(1)  # TODO: config with default values
+        self.spinbox_bins.setDecimals(0)
+        self.spinbox_bins.valueChanged.connect(self.on_spinbox_bins)
+
         if has_u3:
             self.button_trigger = QtGui.QPushButton('Trigger')
             self.button_trigger.clicked.connect(self.on_button_trigger)
@@ -142,6 +149,7 @@ class Frame(QtGui.QWidget):
         if has_u3:
             control_splitter.addWidget(self.button_trigger)
         control_splitter.addWidget(self.spinbox_exposure)
+        control_splitter.addWidget(self.spinbox_bins)
 
         control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
@@ -334,6 +342,18 @@ class Frame(QtGui.QWidget):
         t = self.spinbox_exposure.value()
         self.cam.set_exposure_time(t)
 
+    def on_spinbox_bins(self):
+        """
+        Changes the exposure time of the camera (in ms)
+        """
+        b = int(self.spinbox_bins.value())
+
+        self.cam_thread.pause()
+        time.sleep(.1)
+        self.cam.set_bins(b)
+        time.sleep(.1)
+        self.cam_thread.unpause()
+
     def on_slider_overlay_opacity(self):
         """
         Changes the opacity of the overlay
@@ -404,8 +424,8 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         self.flash_timer.start(500)
 
         # thresholding stuff
-        self.z = np.zeros((1024, 1024), dtype=np.uint8)
-        self.noise_kernel = np.ones((3, 3), np.uint8)
+        self.z = None
+        self.noise_kernel = np.ones((1, 1), np.uint8)
 
     def update(self, img_data=None):
         """
@@ -413,12 +433,17 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         :param img_data: image data, if None only updates overlay
         """
+
         if img_data is not None:
             img_data = self.rescale_image(img_data)
             self.viewer.setImage(img_data)
 
         if self.parent.overlay_active:
             if self.do_threshold:
+
+                if self.z is None or self.z.shape != self.overlay_image.shape:
+                    self.z = np.zeros((self.overlay_image.shape), dtype=np.uint8)
+
                 threshed = self.threshold_overlay(self.overlay_image, self.thresh_value)
                 self.viewer_overlay.setImage(threshed, opacity=self.overlay_opacity)
 
@@ -459,8 +484,10 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :return: 2-D numpy array scaled to 0-255
         """
         img_min, img_max = img.min(), img.max()
+        div = img_max - img_min
+        div = 1 if div == 0 else div  # don't divide by zero
 
-        return pg.functions.rescaleData(img, 255. / (img_max - img_min), img_min, dtype=np.uint8)
+        return pg.functions.rescaleData(img, 255. / div, img_min, dtype=np.uint8)
 
     def flash_overlay(self):
         """
