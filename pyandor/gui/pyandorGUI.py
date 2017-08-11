@@ -5,6 +5,7 @@ __email__ = 'tomlinsa@ohsu.edu'
 __version__ = '0.0.3'
 
 import numpy as np
+from scipy.misc import imresize
 import sys, time, logging
 import cv2
 import pyqtgraph as pg
@@ -27,23 +28,53 @@ except ImportError:
     has_u3 = False
 
 
-class Frame(QtGui.QWidget):
+class Frame(QtGui.QMainWindow):
     """
-    Main frame.
+    Main window
     """
-    def __init__(self):
+    def __init__(self, parent=None):
         """
         init
 
         TODO: write ini
         """
-        super(Frame, self).__init__()
+        super(Frame, self).__init__(parent)
+
         self.setGeometry(100, 100, 750, 600)
         self.setWindowTitle('Andor Viewer')
+
+        # init central widghet
+        self.main_widget = CentralWidget(self)
+        self.setCentralWidget(self.main_widget)
+        self.show()
+
+    def closeEvent(self, event):
+        """
+        Intercept close event to properly shut down camera and thread.
+
+        :param event:
+        """
+        self.main_widget.shutdown_camera()
+        super(Frame, self).closeEvent(event)
+
+
+class CentralWidget(QtGui.QWidget):
+    """
+    Main frame.
+    """
+    def __init__(self, parent=None):
+        """
+        init
+
+        TODO: write ini
+        """
+        super(CentralWidget, self).__init__(parent)
+        self.frame = parent
 
         # instance attributes
         self.playing = True
         self.overlay_active = False
+        self.bins = 1
 
         self.trigger_mode = 'internal'
         if has_u3:
@@ -74,7 +105,6 @@ class Frame(QtGui.QWidget):
         layout_frame.addLayout(layout_viewer_slider)
         layout_frame.addLayout(layout_controls)
         self.setLayout(layout_frame)
-        self.show()
 
         # andor camera init
         self.cam = AndorCamera()
@@ -86,6 +116,8 @@ class Frame(QtGui.QWidget):
         # start capturing frames
         self.cam_thread.start()
         self.cam_thread.unpause()  # TODO: decide if we start playing or paused
+
+        # self.create_status_bar()
 
     def setup_controls(self):
         """
@@ -130,9 +162,9 @@ class Frame(QtGui.QWidget):
         self.spinbox_exposure.valueChanged.connect(self.on_spinbox_exposure)
 
         self.spinbox_bins = QtGui.QDoubleSpinBox()
-        self.spinbox_bins.setRange(1, 16)
+        self.spinbox_bins.setRange(1, 64)
         self.spinbox_bins.setSingleStep(1)
-        self.spinbox_bins.setValue(1)  # TODO: config with default values
+        self.spinbox_bins.setValue(self.bins)  # TODO: config with default values
         self.spinbox_bins.setDecimals(0)
         self.spinbox_bins.valueChanged.connect(self.on_spinbox_bins)
 
@@ -200,6 +232,13 @@ class Frame(QtGui.QWidget):
         layout_slider_label.addWidget(self.label_slider_overlay_opacity)
 
         return layout_slider_label
+
+    def create_status_bar(self):
+        """
+        Creates the status bar
+        """
+        self.statusbar = QtGui.QStatusBar()
+        self.setStatusBar(self.statusbar)
 
     def update_overlay(self):
         """
@@ -349,20 +388,33 @@ class Frame(QtGui.QWidget):
         """
         b = int(self.spinbox_bins.value())
 
-        self.cam_thread.pause()
-        time.sleep(.3)
+        bins = [1, 2, 4, 8, 16, 32, 64]
 
-        # sometimes doesn't pause in time if rapid switch
-        try:
-            self.cam.set_bins(b)
-        except AndorAcqInProgress:
-            raise
+        if b in bins:
+            self.cam_thread.pause()
+            time.sleep(.3)
 
-        time.sleep(.1)
-        self.cam_thread.unpause()
-        # need to wait for unpause, in case try to change binning again
-        while self.cam_thread.paused:
-            pass
+            # sometimes doesn't pause in time if rapid switch
+            try:
+                self.cam.set_bins(b)
+                self.bins = b
+            except AndorAcqInProgress:
+                raise
+
+            time.sleep(.1)
+            self.cam_thread.unpause()
+            # need to wait for unpause, in case try to change binning again
+            while self.cam_thread.paused:
+                pass
+
+        else:  # TODO: decide if pass or only arrows
+            # pass
+            idx = bins.index(self.bins)
+            if b < self.bins:
+                self.spinbox_bins.setValue(bins[idx - 1])
+            elif b > self.bins:
+                print('yo', b)
+                self.spinbox_bins.setValue(bins[idx + 1])
 
     def on_slider_overlay_opacity(self):
         """
@@ -388,7 +440,7 @@ class Frame(QtGui.QWidget):
         if self.overlay_active:
             self.update_overlay()
 
-    def closeEvent(self, event):
+    def shutdown_camera(self):
         """
         Intercept close event to properly shut down camera and thread.
 
@@ -396,7 +448,6 @@ class Frame(QtGui.QWidget):
         """
         self.cam_thread.stop()
         self.cam.close()
-        super(Frame, self).closeEvent(event)
 
 
 class ImageWidget(pg.GraphicsLayoutWidget, object):
@@ -449,6 +500,9 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         if self.parent.overlay_active:
             if self.do_threshold:
+
+                if img_data is not None and img_data.shape != self.overlay_image.shape:
+                    self.overlay_image = imresize(self.overlay_image, img_data.shape)
 
                 if self.z is None or self.z.shape != self.overlay_image.shape:
                     self.z = np.zeros((self.overlay_image.shape), dtype=np.uint8)
