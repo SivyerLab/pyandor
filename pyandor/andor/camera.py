@@ -232,7 +232,8 @@ class Camera(object):
     def set_exposure_time(self, t):
         """Set the exposure time."""
         self.t_ms = t
-        self.update_exposure_time(t)
+        timings = self.update_exposure_time(t)
+        return timings
 
     def update_exposure_time(self, t):
         """Camera-specific code for setting the exposure time should

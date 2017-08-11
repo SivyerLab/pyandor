@@ -28,6 +28,9 @@ def _int_ptr(val=0):
 class AndorError(CameraError):
     """Andor-specific camera errors."""
 
+class AndorAcqInProgress(AndorError):
+    """Andor acquisiton in progress error"""
+
 
 class AndorCamera(Camera):
     """Class for controlling Andor cameras. This is designed
@@ -80,6 +83,7 @@ class AndorCamera(Camera):
             logger.warn(
                 "Action not completed when data acquisition is in progress!")
             logger.debug(''.join(tb.format_list(tb.extract_stack())))
+            raise AndorAcqInProgress
         elif status == ANDOR_STATUS['DRV_TEMPERATURE_OFF']:
             pass
         elif status == ANDOR_STATUS['DRV_TEMPERATURE_NOT_REACHED']:
@@ -133,7 +137,8 @@ class AndorCamera(Camera):
         self.shape = [xpx.contents.value, ypx.contents.value]
         # self._chk(self.clib.SetReadMode(4)) # image read mode
         self.set_crop([1, self.shape[0], 1, self.shape[1]])
-        self.set_bins(1)
+        self.set_bins(2)
+        # self.set_bins(1)
         self.use_noise_filter = kwargs.get('use_noise_filter', False)
         self.wait_for_temp = kwargs.get('wait_for_temp', True)
 
@@ -355,6 +360,8 @@ class AndorCamera(Camera):
             '\texposure = %.03f\n' % exposure.value +
             '\taccumulate = %.03f\n' % accumulate.value +
             '\tkinetic = %.03f' % kinetic.value)
+
+        return exposure.value, accumulate.value, kinetic.value
 
     def get_exposure_time(self):
 
