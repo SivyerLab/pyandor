@@ -621,8 +621,11 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         if self.out is None:
             self.out = cv2.VideoWriter(path,
-                                       fourcc=cv2.cv.CV_FOURCC(*'XVID'),
-                                       fps=60,
+                                       fourcc=cv2.VideoWriter_fourcc('m',
+                                                                     'p',
+                                                                     '4',
+                                                                     'v'),
+                                       fps=10,
                                        frameSize=(1024, 1024))
 
         else:
@@ -634,8 +637,10 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         if self.out is not None:
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+            frame = cv2.transpose(frame)
+            frame = cv2.flip(frame, 0)
+
             self.out.write(frame)
-            print('writing')
 
         else:
             raise IOError('VideoWriter not created. Nothing with which to '
