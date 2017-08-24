@@ -453,6 +453,12 @@ class CentralWidget(QtGui.QWidget):
             try:
                 self.cam.set_bins(b)
                 self.bins = b
+                if b == 1:
+                    self.image_viewer.noise_kernel = np.ones((3, 3), np.uint8)
+                else:
+                    self.image_viewer.noise_kernel = np.ones((1, 1), np.uint8)
+
+
             except AndorAcqInProgress:
                 raise
 
