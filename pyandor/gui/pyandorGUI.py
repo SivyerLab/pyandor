@@ -311,10 +311,10 @@ class CentralWidget(QtGui.QWidget):
             filename = str(QtGui.QFileDialog.getSaveFileName(self, 'Video save', './', selectedFilter='*.mov'))
             if not filename:
                 self.checkbox_record.setChecked(False)
-                return  # TODO: fix this (unchecks, but then won't recheck)
+                return  # TODO: fix this (unchecks, but then recheck does nothing)
 
             self.image_viewer.init_out(filename)
-            gui_logger.info('Will save recording to:\n\t{}'.format(filename))
+            gui_logger.info('Will save recording to:\n\t\t{}'.format(filename))
             self.image_viewer.to_out = checked
 
         else:
@@ -326,6 +326,7 @@ class CentralWidget(QtGui.QWidget):
         Captures the current image to display as overlay.
         """
         self.image_viewer.capture_overlay()
+        gui_logger.info('Overlay captured.')
 
         if self.overlay_active:
             self.update_overlay()
@@ -365,7 +366,6 @@ class CentralWidget(QtGui.QWidget):
         start = 'Start'
         pause = 'Pause'
 
-        # TODO: makes more sense to check attribute or button label?
         if self.button_start_pause.text() == start:
             self.cam_thread.unpause()
             self.playing = True
