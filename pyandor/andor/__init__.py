@@ -24,6 +24,10 @@ def _int_ptr(val=0):
     """Utility function to create integer pointers."""
     return ctypes.pointer(ctypes.c_int(val))
 
+def _uint_ptr(val=0):
+    """Utility function to create integer pointers."""
+    return ctypes.pointer(ctypes.c_uint(val))
+
 
 class AndorError(CameraError):
     """Andor-specific camera errors."""
@@ -375,6 +379,14 @@ class AndorCamera(Camera):
 
         return exposure.value, accumulate.value, kinetic.value
 
+    def get_num_available_images(self):
+        """
+        Gets the number of images in the camera's 48mb circular buffer
+        :return: unsigned int
+        """
+        a, b =_uint_ptr(), _uint_ptr()
+        self._chk(self.clib.GetNumberAvailableImages(a, b))
+        return a.contents.value, b.contents.value
 
     def get_gain(self):
         """Query the current gain settings."""
