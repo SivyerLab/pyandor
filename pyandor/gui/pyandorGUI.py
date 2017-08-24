@@ -1,20 +1,19 @@
 from __future__ import print_function, division
 
-import numpy as np
-from scipy.misc import imresize
-import time
 import sys
+import time
+from collections import deque
+
 import cv2
+import numpy as np
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
+from scipy.misc import imresize
 
-from pyandor.andor import AndorCamera
-from pyandor.andor import AndorAcqInProgress
-from pyandor.andor.log import logger
 from camthread import CameraThread
-
-# fps timing
-from collections import deque
+from pyandor.andor import AndorAcqInProgress
+from pyandor.andor import AndorCamera
+from pyandor.andor.log import logger
 
 # show log during dev
 # from pyandor.andor import log
@@ -134,7 +133,7 @@ class CentralWidget(QtGui.QWidget):
 
         # start capturing frames
         self.cam_thread.start()
-        self.cam_thread.unpause()  # TODO: decide if we start playing or paused
+        self.cam_thread.unpause()
 
     def setup_controls(self):
         """
