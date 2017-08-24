@@ -13,11 +13,13 @@ from scipy.misc import imresize
 from camthread import CameraThread
 from pyandor.andor import AndorAcqInProgress
 from pyandor.andor import AndorCamera
-from pyandor.andor.log import logger
+from pyandor.andor.log import logger, gui_logger
 
 # show log during dev
-# from pyandor.andor import log
-# log.setup_logging(level=logging.DEBUG)
+from pyandor.andor import log
+import logging
+log.setup_logging(logger, level=logging.WARN)
+log.setup_logging(gui_logger, level=logging.INFO)
 
 try:
     import u3
@@ -27,7 +29,7 @@ except ImportError:
 
 __author__ = 'Alexander Tomlinson'
 __email__ = 'tomlinsa@ohsu.edu'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 
 class Frame(QtGui.QMainWindow):
@@ -95,7 +97,7 @@ class CentralWidget(QtGui.QWidget):
         if HAS_U3:
             self.d = u3.U3()
         else:
-            logger.warn('If want triggering, need labjackpython and driver.')
+            gui_logger.warn('If want triggering, need labjackpython and driver.')
 
         # init widgets
         self.image_viewer = ImageWidget(self)
@@ -312,6 +314,7 @@ class CentralWidget(QtGui.QWidget):
                 return  # TODO: fix this (unchecks, but then won't recheck)
 
             self.image_viewer.init_out(filename)
+            gui_logger.info('Will save recording to:\n\t{}'.format(filename))
             self.image_viewer.to_out = checked
 
         else:
@@ -383,7 +386,7 @@ class CentralWidget(QtGui.QWidget):
         Captures a single exposure. Must be paused.
         """
         if self.playing:
-            logger.warn('Must be paused to acquire single exposure!')
+            gui_logger.warn('Must be paused to acquire single exposure!')
             return
 
         self.cam_thread.get_single_image(single_type=self.trigger_mode)
@@ -441,7 +444,7 @@ class CentralWidget(QtGui.QWidget):
         Changes the exposure time of the camera (in ms)
         """
         if self.image_viewer.to_out:
-            logger.warn('Cannot update binning while recording')
+            gui_logger.warn('Cannot update binning while recording')
             self.spinbox_bins.setValue(self.bins)
             return
 
@@ -509,6 +512,7 @@ class CentralWidget(QtGui.QWidget):
         """
         Intercept close event to properly shut down camera and thread.
         """
+        gui_logger.info('Gracefully exiting.')
         if self.image_viewer.out is not None:
             self.checkbox_record.setChecked(False)
         self.cam_thread.stop()
@@ -685,7 +689,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         if self.out is not None:
             self.out.release()
             self.out = None
-            logger.info('Recording saved.')
+            gui_logger.info('Recording saved.')
 
         else:
             raise IOError('VideoWriter not created. Nothing to release.')

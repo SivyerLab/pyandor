@@ -9,6 +9,7 @@ except ImportError:
     colorama = None
 
 logger = logging.getLogger('qCamera')
+gui_logger = logging.getLogger('GUI')
 
 
 class LogFormatter(logging.Formatter):
@@ -61,7 +62,7 @@ class LogFormatter(logging.Formatter):
         return formatted
 
 
-def setup_logging(level=logging.INFO, stream=True, file=False, color=True):
+def setup_logging(log, level=logging.INFO, stream=True, file=False, color=True):
     """Configure logging with default formatting.
 
     Keyword arguments
@@ -81,8 +82,8 @@ def setup_logging(level=logging.INFO, stream=True, file=False, color=True):
         handler = logging.StreamHandler(sys.stdout)
         formatter = LogFormatter()
         handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(level)
+        log.addHandler(handler)
+        log.setLevel(level)
     if file:
         pass  # TODO
 
