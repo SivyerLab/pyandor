@@ -1,18 +1,15 @@
 from __future__ import print_function, division
 
-__author__ = 'Alexander Tomlinson'
-__email__ = 'tomlinsa@ohsu.edu'
-__version__ = '0.0.3'
-
 import numpy as np
 from scipy.misc import imresize
-import sys, time, logging
+import time
+import sys
 import cv2
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 
 from pyandor.andor import AndorCamera
-from pyandor.andor import AndorError, AndorAcqInProgress
+from pyandor.andor import AndorAcqInProgress
 from pyandor.andor.log import logger
 from camthread import CameraThread
 
@@ -20,15 +17,18 @@ from camthread import CameraThread
 from collections import deque
 
 # show log during dev
-from pyandor.andor import log
-log.setup_logging(level=logging.DEBUG)
+# from pyandor.andor import log
+# log.setup_logging(level=logging.DEBUG)
 
-global has_u3
 try:
     import u3
-    has_u3 = True
+    HAS_U3 = True
 except ImportError:
-    has_u3 = False
+    HAS_U3 = False
+
+__author__ = 'Alexander Tomlinson'
+__email__ = 'tomlinsa@ohsu.edu'
+__version__ = '0.0.3'
 
 
 class Frame(QtGui.QMainWindow):
@@ -48,7 +48,7 @@ class Frame(QtGui.QMainWindow):
 
         self.statusbar = self.create_status_bar()
 
-        # init central widghet
+        # init central widget
         self.main_widget = CentralWidget(self)
 
         self.setCentralWidget(self.main_widget)
@@ -93,7 +93,7 @@ class CentralWidget(QtGui.QWidget):
         self.bins = 1
 
         self.trigger_mode = 'internal'
-        if has_u3:
+        if HAS_U3:
             self.d = u3.U3()
         else:
             logger.warn('If want triggering, need labjackpython and driver.')
@@ -170,7 +170,7 @@ class CentralWidget(QtGui.QWidget):
 
         self.combobox_trigger = QtGui.QComboBox()
         self.combobox_trigger.addItem('internal')
-        if has_u3:
+        if HAS_U3:
             self.combobox_trigger.addItems(['external', 'exposure'])
         self.combobox_trigger.currentIndexChanged.connect(self.on_combobox_trigger)
 
@@ -188,7 +188,7 @@ class CentralWidget(QtGui.QWidget):
         self.spinbox_bins.setDecimals(0)
         self.spinbox_bins.valueChanged.connect(self.on_spinbox_bins)
 
-        if has_u3:
+        if HAS_U3:
             self.button_trigger = QtGui.QPushButton('Trigger')
             self.button_trigger.clicked.connect(self.on_button_trigger)
 
@@ -200,7 +200,7 @@ class CentralWidget(QtGui.QWidget):
         control_splitter.addWidget(self.button_overlay)
         control_splitter.addWidget(self.combobox_trigger)
         control_splitter.addWidget(self.button_single)
-        if has_u3:
+        if HAS_U3:
             control_splitter.addWidget(self.button_trigger)
         control_splitter.addWidget(self.spinbox_exposure)
         control_splitter.addWidget(self.spinbox_bins)
@@ -208,6 +208,7 @@ class CentralWidget(QtGui.QWidget):
         control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
 
+    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_slider_threshold(self):
         """
         Sets up the slider for opacity
@@ -231,6 +232,7 @@ class CentralWidget(QtGui.QWidget):
 
         return layout_slider_label
 
+    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_slider_opacity(self):
         """
         Sets up the slider for opacity
@@ -254,6 +256,7 @@ class CentralWidget(QtGui.QWidget):
 
         return layout_slider_label
 
+    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_status_bar(self):
         """
         Sets up the permanent labels in the status bar
@@ -273,8 +276,6 @@ class CentralWidget(QtGui.QWidget):
     def update_overlay(self):
         """
         Updates the overlay.
-
-        :param img_data_overlay: image data of the overlay
         """
         self.image_viewer.update(img_data=None)
 
@@ -393,9 +394,9 @@ class CentralWidget(QtGui.QWidget):
 
     def on_button_trigger(self):
         """
-        Sends a TTL trigger to capture an expsosure.
+        Sends a TTL trigger to capture an exposure.
         """
-        if not has_u3:
+        if not HAS_U3:
             return
 
         if self.trigger_mode == 'external' and not self.playing:
@@ -408,11 +409,9 @@ class CentralWidget(QtGui.QWidget):
             if self.trigger_mode == 'external exposure':
                 self.send_trigger(t=0.2)
 
-    def on_combobox_trigger(self, idx):
+    def on_combobox_trigger(self):
         """
         Handles combobox selection for trigger mode
-
-        :param idx: index of combobox selection
         """
         selection = str(self.combobox_trigger.currentText())
 
@@ -457,7 +456,6 @@ class CentralWidget(QtGui.QWidget):
                     self.image_viewer.noise_kernel = np.ones((3, 3), np.uint8)
                 else:
                     self.image_viewer.noise_kernel = np.ones((1, 1), np.uint8)
-
 
             except AndorAcqInProgress:
                 raise
@@ -505,8 +503,6 @@ class CentralWidget(QtGui.QWidget):
     def shutdown_camera(self):
         """
         Intercept close event to properly shut down camera and thread.
-
-        :param event:
         """
         if self.image_viewer.out is not None:
             self.checkbox_record.setChecked(False)
@@ -617,6 +613,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         # rescale to 255 to allow threshold slider
         self.overlay_image = self.rescale_image(data)
 
+    # noinspection PyMethodMayBeStatic
     def rescale_image(self, img):
         """
         Rescales image into 0-255
@@ -661,16 +658,16 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         else:
             raise IOError('VideoWriter already created. Release first.')
 
-    def write_out(self, frame):
+    def write_out(self, img_data):
         """
         Writes frames to file.
         """
         if self.out is not None:
-            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-            frame = cv2.transpose(frame)
-            frame = cv2.flip(frame, 0)
+            img_data = cv2.cvtColor(img_data, cv2.COLOR_GRAY2BGR)
+            img_data = cv2.transpose(img_data)
+            img_data = cv2.flip(img_data, 0)
 
-            self.out.write(frame)
+            self.out.write(img_data)
 
         else:
             raise IOError('VideoWriter not created. Nothing with which to '
@@ -687,7 +684,6 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         else:
             raise IOError('VideoWriter not created. Nothing to release.')
-
 
 
 if __name__ == '__main__':
