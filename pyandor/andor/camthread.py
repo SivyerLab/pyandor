@@ -5,8 +5,8 @@ import time
 from Queue import Queue
 import numpy as np
 
-from pyandor.andor.camera import Camera
-from pyandor.andor.log import logger
+from camera import Camera
+from log import logger
 from PyQt4 import QtCore
 
 

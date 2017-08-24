@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 
+import logging
 import sys
 import time
 from collections import deque
@@ -10,14 +11,11 @@ import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 from scipy.misc import imresize
 
-from camthread import CameraThread
 from pyandor.andor import AndorAcqInProgress
 from pyandor.andor import AndorCamera
-from pyandor.andor.log import logger, gui_logger
-
-# show log during dev
 from pyandor.andor import log
-import logging
+from pyandor.andor.camthread import CameraThread
+from pyandor.andor.log import logger, gui_logger
 log.setup_logging(logger, level=logging.WARN)
 log.setup_logging(gui_logger, level=logging.INFO)
 

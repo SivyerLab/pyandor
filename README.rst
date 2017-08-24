@@ -31,5 +31,5 @@ TODO
 Credits
 -------
 
-The source code in /andor, along with gui/camthread.py, was developed by the `Ion Trap Group <https://bitbucket.org/iontrapgroup/qcamera>`_
+The source code in /andor was developed by the `Ion Trap Group <https://bitbucket.org/iontrapgroup/qcamera>`_
 at Aarhus University. See LICENSE in /andor for details. Many thanks to them for their work.
