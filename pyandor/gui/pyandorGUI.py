@@ -306,11 +306,17 @@ class CentralWidget(QtGui.QWidget):
         """
         checked = state == QtCore.Qt.Checked
 
-        self.image_viewer.to_out = checked
-
         if checked:
-            self.image_viewer.init_out()
+            filename = str(QtGui.QFileDialog.getSaveFileName(self, 'Video save', './', selectedFilter='*.mov'))
+            if not filename:
+                self.checkbox_record.setChecked(False)
+                return  # TODO: fix this (unchecks, but then won't recheck)
+
+            self.image_viewer.init_out(filename)
+            self.image_viewer.to_out = checked
+
         else:
+            self.image_viewer.to_out = checked
             self.image_viewer.release_out()
 
     def on_button_capture_overlay(self):
