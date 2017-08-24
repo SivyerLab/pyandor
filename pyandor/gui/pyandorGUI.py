@@ -16,6 +16,7 @@ from pyandor.andor import AndorCamera
 from pyandor.andor import log
 from pyandor.andor.camthread import CameraThread
 from pyandor.andor.log import logger, gui_logger
+
 log.setup_logging(logger, level=logging.WARN)
 log.setup_logging(gui_logger, level=logging.INFO)
 
