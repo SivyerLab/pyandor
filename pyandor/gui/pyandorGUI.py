@@ -16,6 +16,9 @@ from pyandor.andor import AndorError, AndorAcqInProgress
 from pyandor.andor.log import logger
 from camthread import CameraThread
 
+# fps timing
+from collections import deque
+
 # show log during dev
 from pyandor.andor import log
 log.setup_logging(level=logging.DEBUG)
@@ -264,6 +267,9 @@ class CentralWidget(QtGui.QWidget):
         self.status_exposure = QtGui.QLabel('Exposure: {:.2f} ms'.format(16))
         self.frame.statusbar.addPermanentWidget(self.status_exposure)
 
+        self.status_fps = QtGui.QLabel('FPS: {:.2f} fps'.format(0))
+        self.frame.statusbar.addPermanentWidget(self.status_fps)
+
     def update_overlay(self):
         """
         Updates the overlay.
@@ -430,6 +436,11 @@ class CentralWidget(QtGui.QWidget):
         """
         Changes the exposure time of the camera (in ms)
         """
+        if self.image_viewer.to_out:
+            logger.warn('Cannot update binning while recording')
+            self.spinbox_bins.setValue(self.bins)
+            return
+
         b = int(self.spinbox_bins.value())
 
         bins = [1, 2, 4, 8, 16, 32, 64]
@@ -446,10 +457,12 @@ class CentralWidget(QtGui.QWidget):
                 raise
 
             time.sleep(.1)
-            self.cam_thread.unpause()
-            # need to wait for unpause, in case try to change binning again
-            while self.cam_thread.paused:
-                pass
+
+            if self.playing:
+                self.cam_thread.unpause()
+                # need to wait for unpause, in case try to change binning again
+                while self.cam_thread.paused:
+                    pass
 
         else:  # TODO: decide if pass or only arrows
             # pass
@@ -457,7 +470,6 @@ class CentralWidget(QtGui.QWidget):
             if b < self.bins:
                 self.spinbox_bins.setValue(bins[idx - 1])
             elif b > self.bins:
-                print('yo', b)
                 self.spinbox_bins.setValue(bins[idx + 1])
 
     def on_slider_overlay_opacity(self):
@@ -490,6 +502,8 @@ class CentralWidget(QtGui.QWidget):
 
         :param event:
         """
+        if self.image_viewer.out is not None:
+            self.checkbox_record.setChecked(False)
         self.cam_thread.stop()
         self.cam.close()
 
@@ -525,7 +539,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
 
         vb.setAspectLocked(True)
 
-        # timer for flashing overaly
+        # timer for flashing overlay
         self.flash_timer = QtCore.QTimer(self)
         self.flash_timer.timeout.connect(self.flash_overlay)
         self.flash_timer.start(500)
@@ -533,6 +547,10 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         # thresholding stuff
         self.z = None
         self.noise_kernel = np.ones((3, 3), np.uint8)
+
+        # timing deque
+        self.deque = deque([0], maxlen=10)
+        self.fps = 7
 
     def update(self, img_data=None):
         """
@@ -543,6 +561,12 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         if img_data is not None:
             img_data = self.rescale_image(img_data)
             self.viewer.setImage(img_data)
+
+            t = time.clock()
+            self.deque.append(t)
+            self.fps = np.mean(np.diff(self.deque))**-1
+            self.parent.status_fps.setText('FPS: {:.2f} fps'.format(self.fps))
+
             if self.to_out:
                 self.write_out(img_data)
 
@@ -553,7 +577,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
                     self.overlay_image = imresize(self.overlay_image, img_data.shape)
 
                 if self.z is None or self.z.shape != self.overlay_image.shape:
-                    self.z = np.zeros((self.overlay_image.shape), dtype=np.uint8)
+                    self.z = np.zeros(self.overlay_image.shape, dtype=np.uint8)
 
                 threshed = self.threshold_overlay(self.overlay_image, self.thresh_value)
                 self.viewer_overlay.setImage(threshed, opacity=self.overlay_opacity)
@@ -625,7 +649,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
                                                                      'p',
                                                                      '4',
                                                                      'v'),
-                                       fps=10,
+                                       fps=round(self.fps),
                                        frameSize=(1024, 1024))
 
         else:
