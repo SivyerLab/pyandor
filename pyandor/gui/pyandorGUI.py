@@ -208,7 +208,6 @@ class CentralWidget(QtGui.QWidget):
         control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
 
-    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_slider_threshold(self):
         """
         Sets up the slider for opacity
@@ -232,7 +231,6 @@ class CentralWidget(QtGui.QWidget):
 
         return layout_slider_label
 
-    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_slider_opacity(self):
         """
         Sets up the slider for opacity
@@ -256,7 +254,6 @@ class CentralWidget(QtGui.QWidget):
 
         return layout_slider_label
 
-    # noinspection PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit,PyAttributeOutsideInit
     def setup_status_bar(self):
         """
         Sets up the permanent labels in the status bar
@@ -621,7 +618,6 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         # rescale to 255 to allow threshold slider
         self.overlay_image = self.rescale_image(data)
 
-    # noinspection PyMethodMayBeStatic
     def rescale_image(self, img):
         """
         Rescales image into 0-255
