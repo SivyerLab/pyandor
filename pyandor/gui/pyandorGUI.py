@@ -89,6 +89,7 @@ class CentralWidget(QtGui.QWidget):
         self.frame = parent
 
         # instance attributes
+        self.connected = False
         self.playing = False
         self.overlay_active = False
         self.bins = 1
@@ -143,11 +144,11 @@ class CentralWidget(QtGui.QWidget):
             self.cam_thread.start()
             self.cam_thread.unpause()
 
+            self.connected = True
             self.playing = True
 
         except AndorError:
             gui_logger.warn('Could not connect to camera')
-
 
     def setup_controls(self):
         """
@@ -339,7 +340,6 @@ class CentralWidget(QtGui.QWidget):
         Captures the current image to display as overlay.
         """
         self.image_viewer.capture_overlay()
-        gui_logger.info('Overlay captured.')
 
         if self.overlay_active:
             self.update_overlay()
@@ -379,6 +379,10 @@ class CentralWidget(QtGui.QWidget):
         start = 'Start'
         pause = 'Pause'
 
+        if not self.connected:
+            gui_logger.warn('Not connected to camera.')
+            return
+
         if self.button_start_pause.text() == start:
             self.cam_thread.unpause()
             self.playing = True
@@ -412,7 +416,6 @@ class CentralWidget(QtGui.QWidget):
 
         if not filename:
             return
-        gui_logger.info('Will save screenshot to:\n\t\t{}'.format(filename))
         self.image_viewer.write_screenshot(path=filename)
 
     def send_trigger(self, t=None):
@@ -537,10 +540,13 @@ class CentralWidget(QtGui.QWidget):
         Intercept close event to properly shut down camera and thread.
         """
         gui_logger.info('Gracefully exiting.')
+
         if self.image_viewer.out is not None:
             self.checkbox_record.setChecked(False)
-        self.cam_thread.stop()
-        self.cam.close()
+
+        if self.connected:
+            self.cam_thread.stop()
+            self.cam.close()
 
 
 class ImageWidget(pg.GraphicsLayoutWidget, object):
@@ -643,8 +649,13 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         data = self.viewer.image
 
+        if data is None:
+            gui_logger.warn('Nothing to capture')
+            return
+
         # rescale to 255 to allow threshold slider
         self.overlay_image = self.rescale_image(data)
+        gui_logger.info('Overlay captured.')
 
     def rescale_image(self, img):
         """
@@ -679,7 +690,12 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
             path = 'test_out.mov'
 
         gui_logger.warn('Still in development, but should work.')
-        self.viewer.save('test_out.png')
+
+        try:
+            self.viewer.save('test_out.png')
+            gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
+        except AttributeError:
+            gui_logger.warn('Nothing to save.')
 
     def init_out(self, path=None):
         """
