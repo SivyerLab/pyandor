@@ -11,8 +11,9 @@ import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 from scipy.misc import imresize
 
+sys.path.append('../..')
 from pyandor.andor import AndorAcqInProgress
-from pyandor.andor import AndorCamera
+from pyandor.andor import AndorCamera, AndorError
 from pyandor.andor import log
 from pyandor.andor.camthread import CameraThread
 from pyandor.andor.log import logger, gui_logger
@@ -88,7 +89,7 @@ class CentralWidget(QtGui.QWidget):
         self.frame = parent
 
         # instance attributes
-        self.playing = True
+        self.playing = False
         self.overlay_active = False
         self.bins = 1
 
@@ -125,16 +126,28 @@ class CentralWidget(QtGui.QWidget):
         layout_frame.addLayout(layout_controls)
         self.setLayout(layout_frame)
 
-        # andor camera init
-        self.cam = AndorCamera()
-        self.cam.update_exposure_time(16)
+        self.connect_camera()
 
-        self.cam_thread = CameraThread(self.cam)
-        self.cam_thread.image_signal.connect(self.image_viewer.update)
+    def connect_camera(self):
+        """
+        Attempts to connect to camera
+        """
+        try:
+            self.cam = AndorCamera()
+            self.cam.update_exposure_time(16)
 
-        # start capturing frames
-        self.cam_thread.start()
-        self.cam_thread.unpause()
+            self.cam_thread = CameraThread(self.cam)
+            self.cam_thread.image_signal.connect(self.image_viewer.update)
+
+            # start capturing frames
+            self.cam_thread.start()
+            self.cam_thread.unpause()
+
+            self.playing = True
+
+        except AndorError:
+            gui_logger.warn('Could not connect to camera')
+
 
     def setup_controls(self):
         """
@@ -174,6 +187,9 @@ class CentralWidget(QtGui.QWidget):
             self.combobox_trigger.addItems(['external', 'exposure'])
         self.combobox_trigger.currentIndexChanged.connect(self.on_combobox_trigger)
 
+        self.button_screenshot = QtGui.QPushButton('Screenshot')
+        self.button_screenshot.clicked.connect(self.on_button_screenshot)
+
         self.spinbox_exposure = QtGui.QDoubleSpinBox()
         self.spinbox_exposure.setRange(0, 10000)
         self.spinbox_exposure.setSingleStep(10)
@@ -204,6 +220,7 @@ class CentralWidget(QtGui.QWidget):
             control_splitter.addWidget(self.button_trigger)
         control_splitter.addWidget(self.spinbox_exposure)
         control_splitter.addWidget(self.spinbox_bins)
+        control_splitter.addWidget(self.button_screenshot)
 
         control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
@@ -386,6 +403,17 @@ class CentralWidget(QtGui.QWidget):
             return
 
         self.cam_thread.get_single_image(single_type=self.trigger_mode)
+
+    def on_button_screenshot(self):
+        """
+        Captures a single frame and writes to file.
+        """
+        filename = str(QtGui.QFileDialog.getSaveFileName(self, 'Screenshot save', './', selectedFilter='*.png'))
+
+        if not filename:
+            return
+        gui_logger.info('Will save screenshot to:\n\t\t{}'.format(filename))
+        self.image_viewer.write_screenshot(path=filename)
 
     def send_trigger(self, t=None):
         """
@@ -641,6 +669,18 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
             else:
                 self.viewer_overlay.show()
 
+    def write_screenshot(self, path=None):
+        """
+        Writes a screenshot to file.
+
+        :param path: file save path
+        """
+        if path is None:
+            path = 'test_out.mov'
+
+        gui_logger.warn('Still in development, but should work.')
+        self.viewer.save('test_out.png')
+
     def init_out(self, path=None):
         """
         Creates out object to write video to file.
@@ -690,7 +730,14 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
             raise IOError('VideoWriter not created. Nothing to release.')
 
 
-if __name__ == '__main__':
+def main():
+    """
+    main function
+    """
     app = QtGui.QApplication([])
     frame = Frame()
     sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    main()
