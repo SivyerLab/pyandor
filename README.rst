@@ -13,9 +13,11 @@ included with pyandor. Default is set to use the 64-bit library, to switch to 32
 
 The following Python packages are required:
 
-* pyqt4
+* cv2 (with ffmpeg)
+* pyqt
 * pyqtgraph
 * numpy
+* scipy
 * pillow
 
 Optionally:
@@ -26,7 +28,8 @@ Optionally:
 Installation
 ------------
 
-TODO
+conda install -c menpo opencv
+conda install -y pyqt=4 pyqtgraph numpy scipy pillow
 
 Credits
 -------
