@@ -689,8 +689,6 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         if path is None:
             path = 'test_out.png'
 
-        gui_logger.warn('Still in development, but should work.')
-
         try:
             self.viewer.save(path)
             gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
