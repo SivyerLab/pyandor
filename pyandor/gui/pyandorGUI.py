@@ -687,12 +687,12 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         :param path: file save path
         """
         if path is None:
-            path = 'test_out.mov'
+            path = 'test_out.png'
 
         gui_logger.warn('Still in development, but should work.')
 
         try:
-            self.viewer.save('test_out.png')
+            self.viewer.save(path)
             gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
         except AttributeError:
             gui_logger.warn('Nothing to save.')
