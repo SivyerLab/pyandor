@@ -549,7 +549,7 @@ class CentralWidget(QtGui.QWidget):
             self.cam.close()
 
 
-class ImageWidget(pg.GraphicsLayoutWidget, object):
+class ImageWidget(pg.ImageView, object):
     """
     Widget for the display from the camera.
     """
@@ -557,9 +557,9 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         super(ImageWidget, self).__init__(parent=parent)
         self.parent = parent
 
-        vb = self.addViewBox(row=1, col=1)
+        vb = self.view
 
-        self.viewer = pg.ImageItem()
+        # self.viewer = pg.ImageView()
         self.viewer_overlay = pg.ImageItem()
         # overlay image container
         self.overlay_image = None
@@ -571,7 +571,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         self.out = None
         self.to_out = False
 
-        vb.addItem(self.viewer)
+        # vb.addItem(self.viewer)
         vb.addItem(self.viewer_overlay)
         self.viewer_overlay.hide()
 
@@ -601,7 +601,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         if img_data is not None:
             img_data = self.rescale_image(img_data)
-            self.viewer.setImage(img_data)
+            self.setImage(img_data)
 
             t = time.clock()
             self.deque.append(t)
@@ -647,7 +647,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
         """
         Captures the current image to display as overlay.
         """
-        data = self.viewer.image
+        data = self.image
 
         if data is None:
             gui_logger.warn('Nothing to capture')
@@ -690,7 +690,7 @@ class ImageWidget(pg.GraphicsLayoutWidget, object):
             path = 'test_out.png'
 
         try:
-            self.viewer.save(path)
+            self.save(path)
             gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
         except AttributeError:
             gui_logger.warn('Nothing to save.')
