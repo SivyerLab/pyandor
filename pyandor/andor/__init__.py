@@ -244,18 +244,7 @@ class AndorCamera(Camera):
         will work best in single image acquisition mode.
 
         """
-        # TODO: Check that acquisition was actually started!
-
-        # Wait for acquisition to finish
-        # self.clib.WaitForAcquisition()
-        while False:
-            status = ctypes.c_int(0)
-            self.clib.GetStatus(ctypes.pointer(status))
-            if ANDOR_CODES[status.value] != 'DRV_SUCCESS':
-                print(ANDOR_CODES[status.value])
-            else:
-                break
-            time.sleep(0.1)
+        # TODO: Check that acquisition was actually started, or not in progress!
 
         # Allocate image storage
         img_size = self.shape[0]*self.shape[1]//self.bins**2

@@ -443,32 +443,13 @@ class CentralWidget(QtGui.QWidget):
         Captures a single frame and writes to file.
         """
         first, last = self.cam.get_num_available_images()
+        print()
         print(first, last)
-        img_array, size, shape, bins = self.cam.acquire_images(first, last)
-        print(img_array.size)
-
+        img_array, size, shape, bins = self.cam.acquire_images(first+1, last)
         step = img_array.size // size
 
-        im1 = img_array[0:step]
-        im1.shape = np.array(shape) // self.bins
-
-        im2 = img_array[step:step*2]
-        im2.shape = np.array(shape) // self.bins
-
-        im3 = img_array[step*2:step*3]
-        im3.shape = np.array(shape) // self.bins
-
-        im_last = img_array[-step:]
-        im_last.shape = np.array(shape) // self.bins
-
-        print(im1.shape)
-        print(im2.shape)
-        print(im3.shape)
-        print(im_last.shape)
-        print()
-
-        self.frame.buffer_viewer.viewer.setImage(im2)
         self.frame.buffer_viewer.show()
+        self.frame.buffer_viewer.update_buffer_param(img_array, size, shape, bins, step)
 
     def send_trigger(self, t=None):
         """
@@ -804,12 +785,17 @@ class BufferFrame(QtGui.QMainWindow):
         self.setWindowTitle('Buffer Viewer')
 
         self.statusbar = self.create_status_bar()
-
         # init central widget
         self.viewer = pg.ImageView()
 
         self.setCentralWidget(self.viewer)
-        # self.show()
+
+        # viewer params
+        self.img_array = None
+        self.size = None
+        self.shape = None
+        self.bins = None
+        self.step = None
 
     def create_status_bar(self):
         """
@@ -827,6 +813,40 @@ class BufferFrame(QtGui.QMainWindow):
         :param event:
         """
         self.hide()
+
+    def update_buffer_param(self, img_array, size, shape, bins, step):
+        """
+        Updates the parameters for viewing the buffer
+        :param img_array:
+        :param size:
+        :param shape:
+        :param bins:
+        :param step:
+        :return:
+        """
+        self.img_array = img_array
+        self.size = size
+        self.shape = shape
+        self.bins = bins
+        self.step = step
+
+    def get_im_from_buffer(self, im_number):
+        """
+        Gets the selected image from the buffer.
+
+        :param im_number:
+        :return:
+        """
+        if im_number > self.size:
+            raise AssertionError('Cannot seek out of buffer bounds.')
+
+        im = self.img_array[self.step*im_number:self.step*(im_number+1)]
+        im.shape = np.array(self.shape) // self.bins
+
+        if im.min() == 0:
+            im = None
+
+        return im
 
 
 def main():
