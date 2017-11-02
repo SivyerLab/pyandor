@@ -116,7 +116,7 @@ class CentralWidget(QtGui.QWidget):
         # layout sliders on either side of image viewer
         layout_viewer_slider = QtGui.QHBoxLayout()
         layout_viewer_slider.addLayout(layout_slider_threshold)
-        layout_viewer_slider.addWidget(self.image_viewer)
+        layout_viewer_slider.addWidget(self.image_viewer, 1)
         layout_viewer_slider.addLayout(layout_slider_opacity)
 
         # layout with controls along bottom
@@ -160,6 +160,10 @@ class CentralWidget(QtGui.QWidget):
 
         # setup controls
         control_splitter = QtGui.QVBoxLayout()
+
+        self.checkbox_autolevel = QtGui.QCheckBox('Auto level')
+        self.checkbox_autolevel.setChecked(True)
+        self.checkbox_autolevel.stateChanged.connect(self.on_checkbox_autolevel)
 
         self.checkbox_threshold = QtGui.QCheckBox('Threshold')
         self.checkbox_threshold.stateChanged.connect(self.on_checkbox_threshold)
@@ -209,6 +213,7 @@ class CentralWidget(QtGui.QWidget):
             self.button_trigger = QtGui.QPushButton('Trigger')
             self.button_trigger.clicked.connect(self.on_button_trigger)
 
+        control_splitter.addWidget(self.checkbox_autolevel)
         control_splitter.addWidget(self.checkbox_threshold)
         control_splitter.addWidget(self.checkbox_flash)
         control_splitter.addWidget(self.checkbox_record)
@@ -293,6 +298,14 @@ class CentralWidget(QtGui.QWidget):
         Updates the overlay.
         """
         self.image_viewer.update(img_data=None)
+
+    def on_checkbox_autolevel(self, state):
+        """
+        Updates whether or not to threshold overlay
+        """
+        checked = state == QtCore.Qt.Checked
+
+        self.image_viewer.do_autolevel = checked
 
     def on_checkbox_threshold(self, state):
         """
@@ -566,6 +579,7 @@ class ImageWidget(pg.ImageView, object):
         self.overlay_opacity = 0.5
         self.do_threshold = False
         self.thresh_value = 128
+        self.do_autolevel = True
 
         self.flash = False
         self.out = None
@@ -600,8 +614,8 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
-            img_data = self.rescale_image(img_data)
-            self.setImage(img_data)
+            # img_data = self.rescale_image(img_data)
+            self.setImage(img_data, autoLevels=self.do_autolevel)
 
             t = time.clock()
             self.deque.append(t)
