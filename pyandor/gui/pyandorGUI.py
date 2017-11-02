@@ -195,6 +195,9 @@ class CentralWidget(QtGui.QWidget):
         self.button_screenshot = QtGui.QPushButton('Screenshot')
         self.button_screenshot.clicked.connect(self.on_button_screenshot)
 
+        self.button_test = QtGui.QPushButton('Test')
+        self.button_test.clicked.connect(self.on_button_test)
+
         self.spinbox_exposure = QtGui.QDoubleSpinBox()
         self.spinbox_exposure.setRange(0, 10000)
         self.spinbox_exposure.setSingleStep(10)
@@ -227,6 +230,7 @@ class CentralWidget(QtGui.QWidget):
         control_splitter.addWidget(self.spinbox_exposure)
         control_splitter.addWidget(self.spinbox_bins)
         control_splitter.addWidget(self.button_screenshot)
+        control_splitter.addWidget(self.button_test)
 
         control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return control_splitter
@@ -430,6 +434,16 @@ class CentralWidget(QtGui.QWidget):
         if not filename:
             return
         self.image_viewer.write_screenshot(path=filename)
+
+    def on_button_test(self):
+        """
+        Captures a single frame and writes to file.
+        """
+        print(self.cam.get_num_available_images())
+        buffer, size = self.cam.acquire_images(1, 2)
+        print(size)
+        print(len(buffer))
+        print(len(buffer)/size)
 
     def send_trigger(self, t=None):
         """

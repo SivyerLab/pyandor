@@ -149,7 +149,23 @@ class Camera(object):
         """Set the image acquisition mode."""
         raise NotImplementedError
 
+    def get_num_available_images(self, mode):
+        """Get num of available images."""
+        raise NotImplementedError
+
     def get_image(self):
+        """Acquire the current image from the camera.
+        """
+        img = self.acquire_image_data()
+        return img
+
+    def acquire_image_data(self):
+        """Code for getting image data from the camera should be
+        placed here. This must return a numpy array.
+        """
+        raise NotImplementedError
+
+    def get_images_as_buffer(self, first, last):
         """Acquire the current image from the camera and write it to
         the ring buffer. This function should *not* be overwritten by
         child classes. Instead, everything necessary to acquire an
@@ -157,12 +173,10 @@ class Camera(object):
         :meth:`acquire_image_data` method.
 
         """
-        img = self.acquire_image_data()
-        if self.rbuffer is not None:
-            self.rbuffer.write(img)
-        return img
+        buffer, size = self.acquire_images()
+        return buffer, size
 
-    def acquire_image_data(self):
+    def acquire_images(self, first, last):
         """Code for getting image data from the camera should be
         placed here. This must return a numpy array.
 

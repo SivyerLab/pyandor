@@ -24,8 +24,9 @@ def _int_ptr(val=0):
     """Utility function to create integer pointers."""
     return ctypes.pointer(ctypes.c_int(val))
 
+
 def _uint_ptr(val=0):
-    """Utility function to create integer pointers."""
+    """Utility function to create unsigned integer pointers."""
     return ctypes.pointer(ctypes.c_uint(val))
 
 
@@ -284,6 +285,32 @@ class AndorCamera(Camera):
         img_array = np.frombuffer(c_img, dtype=ctypes.c_long)
         img_array.shape = np.array(self.shape)//self.bins
         return img_array
+
+    def acquire_images(self, first, last):
+        """Acquire the specified images from the image buffer.
+
+        """
+        # Allocate image storage
+        size = (last-first+1)
+        buffer_size = self.shape[0]*self.shape[1]//self.bins**2*size
+        c_array = ctypes.c_long*buffer_size
+        img_buffer = c_array()
+
+        self._chk(self.clib.GetImages(
+            first,
+            last,
+            ctypes.pointer(img_buffer),
+            ctypes.c_ulong(buffer_size),
+            ctypes.pointer(ctypes.c_long(first)),
+            ctypes.pointer(ctypes.c_long(last))
+        ))
+
+        return img_buffer, size
+
+        # # Pythonize and return.
+        # img_array = np.frombuffer(img_buffer, dtype=ctypes.c_long)
+        # img_array.shape = np.array(self.shape)//self.bins
+        # return img_array
 
     # Triggering
     # -------------------------------------------------------------------------
