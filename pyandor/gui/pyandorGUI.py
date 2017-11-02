@@ -575,7 +575,6 @@ class ImageWidget(pg.ImageView, object):
 
         vb = self.view
 
-        # self.viewer = pg.ImageView()
         self.viewer_overlay = pg.ImageItem()
         # overlay image container
         self.overlay_image = None
@@ -617,7 +616,6 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
-            # img_data = self.rescale_image(img_data)
             self.setImage(img_data, autoLevels=self.do_autolevel)
 
             t = time.clock()
@@ -673,19 +671,6 @@ class ImageWidget(pg.ImageView, object):
         # rescale to 255 to allow threshold slider
         self.overlay_image = self.rescale_image(data)
         gui_logger.info('Overlay captured.')
-
-    # def rescale_image(self, img):
-    #     """
-    #     Rescales image into 0-255
-    #
-    #     :param img: 2-D array
-    #     :return: 2-D numpy array scaled to 0-255
-    #     """
-    #     img_min, img_max = img.min(), img.max()
-    #     div = img_max - img_min
-    #     div = 1 if div == 0 else div  # don't divide by zero
-    #
-    #     return pg.functions.rescaleData(img, 255. / div, img_min, dtype=np.uint8)
 
     def flash_overlay(self):
         """
