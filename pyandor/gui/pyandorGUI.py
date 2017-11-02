@@ -704,8 +704,9 @@ class ImageWidget(pg.ImageView, object):
             path = 'test_out.png'
 
         try:
-            self.save(path)
+            self.export(path)
             gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
+
         except AttributeError:
             gui_logger.warn('Nothing to save.')
 
