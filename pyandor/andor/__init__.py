@@ -305,7 +305,8 @@ class AndorCamera(Camera):
             ctypes.pointer(ctypes.c_long(last))
         ))
 
-        return img_buffer, size
+        img_array = np.frombuffer(img_buffer, dtype=ctypes.c_long)
+        return img_array, size, self.shape, self.bins
 
         # # Pythonize and return.
         # img_array = np.frombuffer(img_buffer, dtype=ctypes.c_long)

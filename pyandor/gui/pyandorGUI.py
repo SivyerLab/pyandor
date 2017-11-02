@@ -53,6 +53,8 @@ class Frame(QtGui.QMainWindow):
         self.main_widget = CentralWidget(self)
 
         self.setCentralWidget(self.main_widget)
+
+        self.buffer_viewer = BufferFrame(self)
         self.show()
 
     def create_status_bar(self):
@@ -72,6 +74,7 @@ class Frame(QtGui.QMainWindow):
         :param event:
         """
         self.main_widget.shutdown_camera()
+        self.buffer_viewer.close()
         super(Frame, self).closeEvent(event)
 
 
@@ -439,11 +442,33 @@ class CentralWidget(QtGui.QWidget):
         """
         Captures a single frame and writes to file.
         """
-        print(self.cam.get_num_available_images())
-        buffer, size = self.cam.acquire_images(1, 2)
-        print(size)
-        print(len(buffer))
-        print(len(buffer)/size)
+        first, last = self.cam.get_num_available_images()
+        print(first, last)
+        img_array, size, shape, bins = self.cam.acquire_images(first, last)
+        print(img_array.size)
+
+        step = img_array.size // size
+
+        im1 = img_array[0:step]
+        im1.shape = np.array(shape) // self.bins
+
+        im2 = img_array[step:step*2]
+        im2.shape = np.array(shape) // self.bins
+
+        im3 = img_array[step*2:step*3]
+        im3.shape = np.array(shape) // self.bins
+
+        im_last = img_array[-step:]
+        im_last.shape = np.array(shape) // self.bins
+
+        print(im1.shape)
+        print(im2.shape)
+        print(im3.shape)
+        print(im_last.shape)
+        print()
+
+        self.frame.buffer_viewer.viewer.setImage(im2)
+        self.frame.buffer_viewer.show()
 
     def send_trigger(self, t=None):
         """
@@ -630,7 +655,9 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
-            self.setImage(img_data, autoLevels=self.do_autolevel)
+            self.setImage(img_data,
+                          autoLevels=self.do_autolevel,
+                          autoHistogramRange=self.do_autolevel)
 
             t = time.clock()
             self.deque.append(t)
@@ -759,6 +786,47 @@ class ImageWidget(pg.ImageView, object):
 
         else:
             raise IOError('VideoWriter not created. Nothing to release.')
+
+
+class BufferFrame(QtGui.QMainWindow):
+    """
+    Main window
+    """
+    def __init__(self, parent=None):
+        """
+        init
+
+        TODO: write ini
+        """
+        super(BufferFrame, self).__init__(parent)
+
+        self.setGeometry(100, 100, 600, 600)
+        self.setWindowTitle('Buffer Viewer')
+
+        self.statusbar = self.create_status_bar()
+
+        # init central widget
+        self.viewer = pg.ImageView()
+
+        self.setCentralWidget(self.viewer)
+        # self.show()
+
+    def create_status_bar(self):
+        """
+        Creates the status bar
+        """
+        statusbar = QtGui.QStatusBar()
+        statusbar.setSizeGripEnabled(False)
+        self.setStatusBar(statusbar)
+        return statusbar
+
+    def closeEvent(self, event):
+        """
+        Intercept close event to properly shut down camera and thread.
+
+        :param event:
+        """
+        self.hide()
 
 
 def main():
