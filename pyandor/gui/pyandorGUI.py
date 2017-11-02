@@ -189,7 +189,7 @@ class CentralWidget(QtGui.QWidget):
         self.combobox_trigger = QtGui.QComboBox()
         self.combobox_trigger.addItem('internal')
         if HAS_U3:
-            self.combobox_trigger.addItems(['external', 'exposure'])
+            self.combobox_trigger.addItems(['external', 'TTL High'])
         self.combobox_trigger.currentIndexChanged.connect(self.on_combobox_trigger)
 
         self.button_screenshot = QtGui.QPushButton('Screenshot')
@@ -439,6 +439,7 @@ class CentralWidget(QtGui.QWidget):
         if t is not None:
             time.sleep(t)
         self.d.setFIOState(4, 0)
+        gui_logger.info('triggered by labjack')
 
     def on_button_trigger(self):
         """
@@ -447,13 +448,15 @@ class CentralWidget(QtGui.QWidget):
         if not HAS_U3:
             return
 
-        if self.trigger_mode == 'external' and not self.playing:
-            self.send_trigger()
-
         if not self.playing:
+            if self.trigger_mode == 'internal':
+                gui_logger.warn('Internal mode does not require a trigger. Exposure period is user set.')
+
+            # simulates a TTL blip; when ready change this to do nothing
             if self.trigger_mode == 'external':
                 self.send_trigger()
 
+            # simulates a TTL high; when ready change this to do nothing
             if self.trigger_mode == 'external exposure':
                 self.send_trigger(t=0.2)
 
@@ -464,9 +467,9 @@ class CentralWidget(QtGui.QWidget):
         selection = str(self.combobox_trigger.currentText())
 
         trigger_mode_mapping = {
-            'internal': 'internal',
-            'external': 'external',
-            'exposure': 'external exposure',
+            'internal': 'internal',             # exposure duration is user set, and occurs on button press
+            'external': 'external',             # exposure duration is user set, and occurs on TTL high
+            'TTL High': 'external exposure',    # exposure duration last during TTL high
             'software': 'software'}
 
         self.trigger_mode = trigger_mode_mapping[selection]
@@ -671,18 +674,18 @@ class ImageWidget(pg.ImageView, object):
         self.overlay_image = self.rescale_image(data)
         gui_logger.info('Overlay captured.')
 
-    def rescale_image(self, img):
-        """
-        Rescales image into 0-255
-
-        :param img: 2-D array
-        :return: 2-D numpy array scaled to 0-255
-        """
-        img_min, img_max = img.min(), img.max()
-        div = img_max - img_min
-        div = 1 if div == 0 else div  # don't divide by zero
-
-        return pg.functions.rescaleData(img, 255. / div, img_min, dtype=np.uint8)
+    # def rescale_image(self, img):
+    #     """
+    #     Rescales image into 0-255
+    #
+    #     :param img: 2-D array
+    #     :return: 2-D numpy array scaled to 0-255
+    #     """
+    #     img_min, img_max = img.min(), img.max()
+    #     div = img_max - img_min
+    #     div = 1 if div == 0 else div  # don't divide by zero
+    #
+    #     return pg.functions.rescaleData(img, 255. / div, img_min, dtype=np.uint8)
 
     def flash_overlay(self):
         """
