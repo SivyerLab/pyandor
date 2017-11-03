@@ -300,6 +300,9 @@ class CentralWidget(QtGui.QWidget):
         self.status_fps = QtGui.QLabel('FPS: {:.2f} fps'.format(0))
         self.frame.statusbar.addPermanentWidget(self.status_fps)
 
+        self.status_buffer = QtGui.QLabel('Buffer: {}'.format(0))
+        self.frame.statusbar.addPermanentWidget(self.status_buffer)
+
     def update_overlay(self):
         """
         Updates the overlay.
@@ -640,6 +643,10 @@ class ImageWidget(pg.ImageView, object):
                           autoLevels=self.do_autolevel,
                           autoHistogramRange=self.do_autolevel)
 
+            first, last = self.parent.cam.get_num_available_images()
+            buffer_size = last - first
+            self.parent.status_buffer.setText('Buffer: {}'.format(buffer_size))
+
             t = time.clock()
             self.deque.append(t)
             self.fps = np.mean(np.diff(self.deque))**-1
@@ -692,7 +699,31 @@ class ImageWidget(pg.ImageView, object):
 
         # rescale to 255 to allow threshold slider
         self.overlay_image = self.rescale_image(data)
+        # self.overlay_image = data
         gui_logger.info('Overlay captured.')
+
+    def rescale_image(self, img):
+        """
+        Rescales image into 0-255
+
+        :param img: 2-D array
+        :return: 2-D numpy array scaled to 0-255
+        """
+        img_min, img_max = img.min(), img.max()
+        div = img_max - img_min
+        div = 1 if div == 0 else div  # don't divide by zero
+
+        return pg.functions.rescaleData(img, 255. / div, img_min, dtype=np.uint8)
+
+    def flash_overlay(self):
+        """
+        Toggles overlay if active for flashing effect
+        """
+        if self.parent.overlay_active and self.flash:
+            if self.viewer_overlay.isVisible():
+                self.viewer_overlay.hide()
+            else:
+                self.viewer_overlay.show()
 
     def flash_overlay(self):
         """
@@ -791,7 +822,7 @@ class BufferFrame(QtGui.QMainWindow):
         self.shape = None
         self.bins = None
         self.step = None
-        self.current_im = None
+        self.current_index = None
 
         self.statusbar = self.create_status_bar()
         # init central widget
@@ -806,7 +837,7 @@ class BufferFrame(QtGui.QMainWindow):
         self.central_widget.setLayout(layout_frame)
         self.setCentralWidget(self.central_widget)
 
-        self.show()
+        # self.show()
 
     def create_status_bar(self):
         """
@@ -825,14 +856,27 @@ class BufferFrame(QtGui.QMainWindow):
         """
         control_splitter = QtGui.QHBoxLayout()
 
+        self.button_way_left = QtGui.QPushButton('<<')
+        self.button_way_left.clicked.connect(self.on_button_way_left)
+
         self.button_left = QtGui.QPushButton('<')
         self.button_left.clicked.connect(self.on_button_left)
 
-        self.button_right = QtGui.QPushButton('>')
-        self.button_left.clicked.connect(self.on_button_right)
+        self.label_current_index = QtGui.QLabel('{} / {}'.format('00', '00'))
+        self.label_current_index.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_current_index.setFixedWidth(60)
 
+        self.button_right = QtGui.QPushButton('>')
+        self.button_right.clicked.connect(self.on_button_right)
+
+        self.button_way_right = QtGui.QPushButton('>>')
+        self.button_way_right.clicked.connect(self.on_button_way_right)
+
+        control_splitter.addWidget(self.button_way_left)
         control_splitter.addWidget(self.button_left)
+        control_splitter.addWidget(self.label_current_index)
         control_splitter.addWidget(self.button_right)
+        control_splitter.addWidget(self.button_way_right)
 
         control_splitter.setAlignment(QtCore.Qt.AlignHCenter)
         return control_splitter
@@ -861,13 +905,15 @@ class BufferFrame(QtGui.QMainWindow):
         self.bins = bins
         self.step = step
 
-        first_im = 0
+        first_im = -1
         im1 = None
         while im1 is None:
-            im1 = self.get_im_from_buffer(first_im)
             first_im += 1
+            im1 = self.get_im_from_buffer(first_im)
 
-        self.current_im = first_im
+        self.current_index = first_im
+        self.label_current_index.setText('{} / {}'.format(self.current_index+1, self.size))
+
         self.viewer.setImage(im1)
 
     def get_im_from_buffer(self, im_number):
@@ -877,7 +923,7 @@ class BufferFrame(QtGui.QMainWindow):
         :param im_number:
         :return:
         """
-        if 0 >= im_number > self.size:
+        if im_number < 0 or im_number >= self.size:
             raise AssertionError('Cannot seek out of buffer bounds.')
 
         im = self.img_array[self.step*im_number:self.step*(im_number+1)]
@@ -891,14 +937,15 @@ class BufferFrame(QtGui.QMainWindow):
 
     def on_button_left(self):
         """
-        Seeks right
+        Seeks left
         """
         try:
-            im = self.get_im_from_buffer(self.current_im-1)
-        except AttributeError:
+            im = self.get_im_from_buffer(self.current_index - 1)
+        except AssertionError:
             return
 
-        self.current_im -= 1
+        self.current_index -= 1
+        self.label_current_index.setText('{} / {}'.format(self.current_index + 1, self.size))
 
         if im is not None:
             self.viewer.setImage(im)
@@ -908,11 +955,42 @@ class BufferFrame(QtGui.QMainWindow):
         Seeks right
         """
         try:
-            im = self.get_im_from_buffer(self.current_im+1)
-        except AttributeError:
+            im = self.get_im_from_buffer(self.current_index + 1)
+        except AssertionError:
             return
 
-        self.current_im += 1
+        self.current_index += 1
+        self.label_current_index.setText('{} / {}'.format(self.current_index + 1, self.size))
+
+        if im is not None:
+            self.viewer.setImage(im)
+
+    def on_button_way_left(self):
+        """
+        Seeks to start
+        """
+        try:
+            im = self.get_im_from_buffer(0)
+        except AssertionError:
+            return
+
+        self.current_index = 0
+        self.label_current_index.setText('{} / {}'.format(self.current_index + 1, self.size))
+
+        if im is not None:
+            self.viewer.setImage(im)
+
+    def on_button_way_right(self):
+        """
+        Seeks to end
+        """
+        try:
+            im = self.get_im_from_buffer(self.size-1)
+        except AssertionError:
+            return
+
+        self.current_index = self.size-1
+        self.label_current_index.setText('{} / {}'.format(self.current_index + 1, self.size))
 
         if im is not None:
             self.viewer.setImage(im)
