@@ -631,10 +631,12 @@ class CentralWidget(QtGui.QWidget):
         self.cam_thread.pause()
         time.sleep(.3)
 
-        roi = [self.spinbox_x1,
-               self.spinbox_x2,
-               self.spinbox_y1,
-               self.spinbox_y2]
+        roi = [self.spinbox_x1.value(),
+               self.spinbox_x2.value(),
+               self.spinbox_y1.value(),
+               self.spinbox_y2.value()]
+
+        roi = list(map(int, roi))
 
         # sometimes doesn't pause in time if rapid switch
         try:
