@@ -153,6 +153,8 @@ class CentralWidget(QtGui.QWidget):
 
         except AndorError:
             gui_logger.warn('Could not connect to camera')
+            self.status_playing.setText('Paused')
+            self.button_start_pause.setText('Start')
 
     def setup_controls(self):
         """
@@ -848,7 +850,7 @@ class BufferFrame(QtGui.QMainWindow):
         self.central_widget.setLayout(layout_frame)
         self.setCentralWidget(self.central_widget)
 
-        # self.show()
+        self.show()
 
     def create_status_bar(self):
         """

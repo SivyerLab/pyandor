@@ -141,7 +141,7 @@ class AndorCamera(Camera):
         self._chk(self.clib.GetDetector(xpx, ypx))
         self.shape = [xpx.contents.value, ypx.contents.value]
         # self._chk(self.clib.SetReadMode(4)) # image read mode
-        # self.set_crop([1, self.shape[0], 1, self.shape[1]])
+        self.set_roi([1, self.shape[0], 1, self.shape[1]])
         self.set_bins(1)
         self.use_noise_filter = kwargs.get('use_noise_filter', False)
         self.wait_for_temp = kwargs.get('wait_for_temp', True)
@@ -505,6 +505,7 @@ class AndorCamera(Camera):
                                      self.crop[1],
                                      self.crop[2],
                                      self.crop[3]))
+
         # self._chk(self.clib.SetIsolatedCropMode(int(on),
         #                                         self.bins,
         #                                         256,
@@ -512,20 +513,37 @@ class AndorCamera(Camera):
         #                                         self.bins,
         #                                         self.bins)
 
-    def set_bins(self, bins):
-        """Set binning to bins x bins."""
-        # self.bins = bins
-        self.bins = 1
-        self.crop = [1, 1024, 1, 1024]
+    def set_roi(self, roi, on=True):
+        """Define the portion of the CCD to actually collect data
+        from. Using a reduced sensor area typically allows for faster
+        readout.
+        """
+        self.roi = roi
 
-        logger.info('Updating binning to ' + str(bins))
-        logger.info('Crop: {}'.format(self.crop))
+        logger.info('Updating crop to: ' +
+                    ', '.join([str(x) for x in self.roi]))
+
+        # SetImage is inclusive on both ends, so size is diff + 1
+        self.shape = [self.roi[1] - self.roi[0] + 1,
+                      self.roi[3] - self.roi[2] + 1]
+
         self._chk(self.clib.SetImage(self.bins,
                                      self.bins,
-                                     self.crop[0],
-                                     self.crop[1],
-                                     self.crop[2],
-                                     self.crop[3]))
+                                     self.roi[0],
+                                     self.roi[1],
+                                     self.roi[2],
+                                     self.roi[3]))
 
-        print(self.shape)
-        print(self.crop)
+    def set_bins(self, bins):
+        """Set binning to bins x bins."""
+        self.bins = bins
+
+        logger.info('Updating crop to: ' +
+                    ', '.join([str(x) for x in self.bins]))
+
+        self._chk(self.clib.SetImage(self.bins,
+                                     self.bins,
+                                     self.roi[0],
+                                     self.roi[1],
+                                     self.roi[2],
+                                     self.roi[3]))
