@@ -520,7 +520,7 @@ class AndorCamera(Camera):
         """
         self.roi = roi
 
-        logger.info('Updating crop to: ' +
+        logger.info('Updating roi to: ' +
                     ', '.join([str(x) for x in self.roi]))
 
         # SetImage is inclusive on both ends, so size is diff + 1

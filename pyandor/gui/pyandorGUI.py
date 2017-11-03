@@ -165,7 +165,7 @@ class CentralWidget(QtGui.QWidget):
         # TODO: factor out into separate class?
 
         # setup controls
-        control_splitter = QtGui.QVBoxLayout()
+        layout_control_splitter = QtGui.QVBoxLayout()
 
         self.checkbox_autolevel = QtGui.QCheckBox('Auto level')
         self.checkbox_autolevel.setChecked(True)
@@ -222,24 +222,83 @@ class CentralWidget(QtGui.QWidget):
             self.button_trigger = QtGui.QPushButton('Trigger')
             self.button_trigger.clicked.connect(self.on_button_trigger)
 
-        control_splitter.addWidget(self.checkbox_autolevel)
-        control_splitter.addWidget(self.checkbox_threshold)
-        control_splitter.addWidget(self.checkbox_flash)
-        control_splitter.addWidget(self.checkbox_record)
-        control_splitter.addWidget(self.button_start_pause)
-        control_splitter.addWidget(self.button_capture_overlay)
-        control_splitter.addWidget(self.button_overlay)
-        control_splitter.addWidget(self.combobox_trigger)
-        control_splitter.addWidget(self.button_single)
+        layout_control_splitter.addWidget(self.checkbox_autolevel)
+        layout_control_splitter.addWidget(self.checkbox_threshold)
+        layout_control_splitter.addWidget(self.checkbox_flash)
+        layout_control_splitter.addWidget(self.checkbox_record)
+        layout_control_splitter.addWidget(self.button_start_pause)
+        layout_control_splitter.addWidget(self.button_capture_overlay)
+        layout_control_splitter.addWidget(self.button_overlay)
+        layout_control_splitter.addWidget(self.combobox_trigger)
+        layout_control_splitter.addWidget(self.button_single)
         if HAS_U3:
-            control_splitter.addWidget(self.button_trigger)
-        control_splitter.addWidget(self.spinbox_exposure)
-        control_splitter.addWidget(self.spinbox_bins)
-        control_splitter.addWidget(self.button_screenshot)
-        control_splitter.addWidget(self.button_test)
+            layout_control_splitter.addWidget(self.button_trigger)
+        layout_control_splitter.addWidget(self.spinbox_exposure)
+        layout_control_splitter.addWidget(self.spinbox_bins)
+        layout_control_splitter.addWidget(self.button_screenshot)
+        layout_control_splitter.addWidget(self.button_test)
+        layout_control_splitter.addLayout(self.setup_roi_controls())
 
-        control_splitter.setAlignment(QtCore.Qt.AlignTop)
-        return control_splitter
+        layout_control_splitter.setAlignment(QtCore.Qt.AlignTop)
+        return layout_control_splitter
+
+    def setup_roi_controls(self):
+        """
+        Sets up controls for the roi selection
+
+        :return: gridlayout
+        """
+        layout_grid = QtGui.QGridLayout()
+        layout_grid.setSpacing(5)
+
+        # roi coordinates
+        x1 = QtGui.QLabel('x1')
+        x2 = QtGui.QLabel('x2')
+        y1 = QtGui.QLabel('y1')
+        y2 = QtGui.QLabel('y2')
+
+        # spinboxes
+        self.spinbox_x1 = QtGui.QDoubleSpinBox()
+        self.spinbox_x1.setRange(1, 1024)
+        self.spinbox_x1.setSingleStep(32)
+        self.spinbox_x1.setValue(1)
+        self.spinbox_x1.setDecimals(0)
+
+        self.spinbox_x2 = QtGui.QDoubleSpinBox()
+        self.spinbox_x2.setRange(1, 1024)
+        self.spinbox_x2.setSingleStep(32)
+        self.spinbox_x2.setValue(1024)
+        self.spinbox_x2.setDecimals(0)
+
+        self.spinbox_y1 = QtGui.QDoubleSpinBox()
+        self.spinbox_y1.setRange(1, 1024)
+        self.spinbox_y1.setSingleStep(32)
+        self.spinbox_y1.setValue(1)
+        self.spinbox_y1.setDecimals(0)
+
+        self.spinbox_y2 = QtGui.QDoubleSpinBox()
+        self.spinbox_y2.setRange(1, 1024)
+        self.spinbox_y2.setSingleStep(32)
+        self.spinbox_y2.setValue(1024)
+        self.spinbox_y2.setDecimals(0)
+
+        # connect to slot
+        self.spinbox_x1.valueChanged.connect(self.on_spinbox_roi)
+        self.spinbox_x2.valueChanged.connect(self.on_spinbox_roi)
+        self.spinbox_y1.valueChanged.connect(self.on_spinbox_roi)
+        self.spinbox_y2.valueChanged.connect(self.on_spinbox_roi)
+
+        # add to grid
+        layout_grid.addWidget(x1, 0, 0)
+        layout_grid.addWidget(self.spinbox_x1, 0, 1, 1, 3)
+        layout_grid.addWidget(x2, 1, 0)
+        layout_grid.addWidget(self.spinbox_x2, 1, 1, 1, 3)
+        layout_grid.addWidget(y1, 2, 0)
+        layout_grid.addWidget(self.spinbox_y1, 2, 1, 1, 3)
+        layout_grid.addWidget(y2, 3, 0)
+        layout_grid.addWidget(self.spinbox_y2, 3, 1, 1, 3)
+
+        return layout_grid
 
     def setup_slider_threshold(self):
         """
@@ -558,7 +617,39 @@ class CentralWidget(QtGui.QWidget):
             elif b > self.bins:
                 self.spinbox_bins.setValue(bins[idx + 1])
 
-        self.cam.update_crop(None)
+    def on_spinbox_roi(self):
+        """
+        Changes the roi of the camera
+
+        :return:
+        """
+        if self.image_viewer.to_out:
+            gui_logger.warn('Cannot update binning while recording')
+            self.spinbox_bins.setValue(self.bins)
+            return
+
+        self.cam_thread.pause()
+        time.sleep(.3)
+
+        roi = [self.spinbox_x1,
+               self.spinbox_x2,
+               self.spinbox_y1,
+               self.spinbox_y2]
+
+        # sometimes doesn't pause in time if rapid switch
+        try:
+            self.cam.set_roi(roi)
+
+        except AndorAcqInProgress:
+            raise
+
+        time.sleep(.1)
+
+        if self.playing:
+            self.cam_thread.unpause()
+            # need to wait for unpause, in case try to change binning again
+            while self.cam_thread.paused:
+                pass
 
     def on_slider_overlay_opacity(self):
         """
@@ -738,16 +829,6 @@ class ImageWidget(pg.ImageView, object):
             else:
                 self.viewer_overlay.show()
 
-    def flash_overlay(self):
-        """
-        Toggles overlay if active for flashing effect
-        """
-        if self.parent.overlay_active and self.flash:
-            if self.viewer_overlay.isVisible():
-                self.viewer_overlay.hide()
-            else:
-                self.viewer_overlay.show()
-
     def write_screenshot(self, path=None):
         """
         Writes a screenshot to file.
@@ -759,7 +840,7 @@ class ImageWidget(pg.ImageView, object):
 
         try:
             self.export(path)
-            gui_logger.info('Will save screenshot to:\n\t\t{}'.format(path))
+            gui_logger.info('Screenshot saved to:\n\t\t{}'.format(path))
 
         except AttributeError:
             gui_logger.warn('Nothing to save.')
