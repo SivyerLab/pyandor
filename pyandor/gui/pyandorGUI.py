@@ -18,7 +18,8 @@ from pyandor.andor import log
 from pyandor.andor.camthread import CameraThread
 from pyandor.andor.log import logger, gui_logger
 
-log.setup_logging(logger, level=logging.WARN)
+log.setup_logging(logger, level=logging.INFO)
+# log.setup_logging(logger, level=logging.WARN)
 log.setup_logging(gui_logger, level=logging.INFO)
 
 try:
@@ -504,6 +505,11 @@ class CentralWidget(QtGui.QWidget):
         t = self.spinbox_exposure.value()
         e, a, k = self.cam.set_exposure_time(t)
         self.status_exposure.setText('Exposure: {:.2f} ms'.format(e * 1000))
+        gui_logger.info('New timings:'
+                        '\n\texposure:\t{}'
+                        '\n\taccumulate:\t{}'
+                        '\n\tkinetics:\t{}'
+                        '\n\tEst. FPS:\t{}'.format(e, a, k, k**-1))
 
     def on_spinbox_bins(self):
         """
@@ -549,6 +555,8 @@ class CentralWidget(QtGui.QWidget):
                 self.spinbox_bins.setValue(bins[idx - 1])
             elif b > self.bins:
                 self.spinbox_bins.setValue(bins[idx + 1])
+
+        self.cam.update_crop(None)
 
     def on_slider_overlay_opacity(self):
         """
@@ -643,8 +651,11 @@ class ImageWidget(pg.ImageView, object):
                           autoLevels=self.do_autolevel,
                           autoHistogramRange=self.do_autolevel)
 
-            first, last = self.parent.cam.get_num_available_images()
-            buffer_size = last - first
+            try:
+                first, last = self.parent.cam.get_num_available_images()
+                buffer_size = last - first
+            except AndorError:
+                buffer_size = 0
             self.parent.status_buffer.setText('Buffer: {}'.format(buffer_size))
 
             t = time.clock()

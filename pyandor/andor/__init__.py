@@ -141,7 +141,7 @@ class AndorCamera(Camera):
         self._chk(self.clib.GetDetector(xpx, ypx))
         self.shape = [xpx.contents.value, ypx.contents.value]
         # self._chk(self.clib.SetReadMode(4)) # image read mode
-        self.set_crop([1, self.shape[0], 1, self.shape[1]])
+        # self.set_crop([1, self.shape[0], 1, self.shape[1]])
         self.set_bins(1)
         self.use_noise_filter = kwargs.get('use_noise_filter', False)
         self.wait_for_temp = kwargs.get('wait_for_temp', True)
@@ -163,6 +163,8 @@ class AndorCamera(Camera):
             ctypes.pointer(gmin), ctypes.pointer(gmax)))
         logger.debug(
             "EM gain range = [%i, %i]" % (gmin.value, gmax.value))
+        # self._chk(self.clib.SetFrameTransferMode(ctypes.c_int(1)))
+        # self._chk(self.clib.SetFrameTransferMode(ctypes.c_int(0)))
 
     def get_camera_properties(self):
         """Code for getting camera properties should go here."""
@@ -481,7 +483,7 @@ class AndorCamera(Camera):
     # Cropping and binning
     # -------------------------------------------------------------------------
 
-    def update_crop(self, crop):
+    def update_crop(self, crop, on=True):
         """Define the portion of the CCD to actually collect data
         from. Using a reduced sensor area typically allows for faster
         readout.
@@ -492,18 +494,38 @@ class AndorCamera(Camera):
               doesn't work for some reason.
 
         """
-        logger.info(
-            "Setting new crop to: " + ', '.join([str(x) for x in crop]))
-        self._chk(self.clib.SetImage(
-            self.bins, self.bins,
-            self.crop[0], self.crop[1], self.crop[2], self.crop[3]))
-        # self._chk(self.clib.SetIsolatedCropMode(
-        #    1, self.crop[3], self.crop[1], self.crop[2], self.crop[0]))
+        # logger.info(
+        #     "Setting new crop to: " + ', '.join([str(x) for x in crop]))
+
+        self.crop = [257, 288, 257, 288]
+        self.shape = [32, 32]
+        self._chk(self.clib.SetImage(self.bins,
+                                     self.bins,
+                                     self.crop[0],
+                                     self.crop[1],
+                                     self.crop[2],
+                                     self.crop[3]))
+        # self._chk(self.clib.SetIsolatedCropMode(int(on),
+        #                                         self.bins,
+        #                                         256,
+        #                                         256,
+        #                                         self.bins,
+        #                                         self.bins)
 
     def set_bins(self, bins):
         """Set binning to bins x bins."""
-        self.bins = bins
+        # self.bins = bins
+        self.bins = 1
+        self.crop = [1, 1024, 1, 1024]
+
         logger.info('Updating binning to ' + str(bins))
-        self._chk(self.clib.SetImage(
-            self.bins, self.bins,
-            self.crop[0], self.crop[1], self.crop[2], self.crop[3]))
+        logger.info('Crop: {}'.format(self.crop))
+        self._chk(self.clib.SetImage(self.bins,
+                                     self.bins,
+                                     self.crop[0],
+                                     self.crop[1],
+                                     self.crop[2],
+                                     self.crop[3]))
+
+        print(self.shape)
+        print(self.crop)
