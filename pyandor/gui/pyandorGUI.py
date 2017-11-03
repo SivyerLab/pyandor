@@ -783,12 +783,7 @@ class BufferFrame(QtGui.QMainWindow):
 
         self.setGeometry(100, 100, 600, 600)
         self.setWindowTitle('Buffer Viewer')
-
-        self.statusbar = self.create_status_bar()
-        # init central widget
-        self.viewer = pg.ImageView()
-
-        self.setCentralWidget(self.viewer)
+        self.central_widget = QtGui.QWidget()
 
         # viewer params
         self.img_array = None
@@ -796,6 +791,22 @@ class BufferFrame(QtGui.QMainWindow):
         self.shape = None
         self.bins = None
         self.step = None
+        self.current_im = None
+
+        self.statusbar = self.create_status_bar()
+        # init central widget
+        self.viewer = pg.ImageView()
+
+        # top level layout
+        layout_frame = QtGui.QVBoxLayout()
+
+        layout_frame.addWidget(self.viewer)
+        layout_frame.addLayout(self.setup_controls())
+
+        self.central_widget.setLayout(layout_frame)
+        self.setCentralWidget(self.central_widget)
+
+        self.show()
 
     def create_status_bar(self):
         """
@@ -805,6 +816,26 @@ class BufferFrame(QtGui.QMainWindow):
         statusbar.setSizeGripEnabled(False)
         self.setStatusBar(statusbar)
         return statusbar
+
+    def setup_controls(self):
+        """
+        Method to gen buttons, outside of init
+
+        :return: QHBoxLayout with buttons
+        """
+        control_splitter = QtGui.QHBoxLayout()
+
+        self.button_left = QtGui.QPushButton('<')
+        self.button_left.clicked.connect(self.on_button_left)
+
+        self.button_right = QtGui.QPushButton('>')
+        self.button_left.clicked.connect(self.on_button_right)
+
+        control_splitter.addWidget(self.button_left)
+        control_splitter.addWidget(self.button_right)
+
+        control_splitter.setAlignment(QtCore.Qt.AlignHCenter)
+        return control_splitter
 
     def closeEvent(self, event):
         """
@@ -830,6 +861,15 @@ class BufferFrame(QtGui.QMainWindow):
         self.bins = bins
         self.step = step
 
+        first_im = 0
+        im1 = None
+        while im1 is None:
+            im1 = self.get_im_from_buffer(first_im)
+            first_im += 1
+
+        self.current_im = first_im
+        self.viewer.setImage(im1)
+
     def get_im_from_buffer(self, im_number):
         """
         Gets the selected image from the buffer.
@@ -837,16 +877,45 @@ class BufferFrame(QtGui.QMainWindow):
         :param im_number:
         :return:
         """
-        if im_number > self.size:
+        if 0 >= im_number > self.size:
             raise AssertionError('Cannot seek out of buffer bounds.')
 
         im = self.img_array[self.step*im_number:self.step*(im_number+1)]
         im.shape = np.array(self.shape) // self.bins
 
-        if im.min() == 0:
+        # sometimes data comes back empty
+        if im.min() == 0 and im.min() == 0:
             im = None
 
         return im
+
+    def on_button_left(self):
+        """
+        Seeks right
+        """
+        try:
+            im = self.get_im_from_buffer(self.current_im-1)
+        except AttributeError:
+            return
+
+        self.current_im -= 1
+
+        if im is not None:
+            self.viewer.setImage(im)
+
+    def on_button_right(self):
+        """
+        Seeks right
+        """
+        try:
+            im = self.get_im_from_buffer(self.current_im+1)
+        except AttributeError:
+            return
+
+        self.current_im += 1
+
+        if im is not None:
+            self.viewer.setImage(im)
 
 
 def main():
