@@ -632,7 +632,7 @@ class CentralWidget(QtGui.QWidget):
                 self.spinbox_bins.setValue(bins[idx + 1])
 
     def on_spinbox_roi(self):
-        pass
+        # TODO: make this change ROI box
 
     def on_button_set_roi(self):
         """
