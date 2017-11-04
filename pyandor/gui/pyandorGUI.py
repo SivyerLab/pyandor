@@ -131,7 +131,12 @@ class CentralWidget(QtGui.QWidget):
         layout_frame.addLayout(layout_controls)
         self.setLayout(layout_frame)
 
-        self.connect_camera()
+        if not self.connect_camera():
+            import scipy as sp
+            dummy_data = sp.misc.imread("C:\Users\Alex\Desktop\grayscale_bars.png")
+            dummy_data = np.dsplit(dummy_data, 4)[0]
+            dummy_data.shape = (512, 512)
+            self.image_viewer.update(dummy_data)
 
     def connect_camera(self):
         """
@@ -151,10 +156,14 @@ class CentralWidget(QtGui.QWidget):
             self.connected = True
             self.playing = True
 
+            return True
+
         except AndorError:
             gui_logger.warn('Could not connect to camera')
             self.status_playing.setText('Paused')
             self.button_start_pause.setText('Start')
+
+            return False
 
     def setup_controls(self):
         """
@@ -239,6 +248,10 @@ class CentralWidget(QtGui.QWidget):
         layout_control_splitter.addWidget(self.button_test)
         layout_control_splitter.addLayout(self.setup_roi_controls())
 
+        self.button_set_roi = QtGui.QPushButton('Set ROI')
+        self.button_set_roi.clicked.connect(self.on_button_set_roi)
+        layout_control_splitter.addWidget(self.button_set_roi)
+
         layout_control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return layout_control_splitter
 
@@ -296,6 +309,7 @@ class CentralWidget(QtGui.QWidget):
         layout_grid.addWidget(y1, 2, 0)
         layout_grid.addWidget(self.spinbox_y1, 2, 1, 1, 3)
         layout_grid.addWidget(y2, 3, 0)
+        layout_grid.addWidget(self.spinbox_y2, 3, 1, 1, 3)
         layout_grid.addWidget(self.spinbox_y2, 3, 1, 1, 3)
 
         return layout_grid
@@ -618,6 +632,9 @@ class CentralWidget(QtGui.QWidget):
                 self.spinbox_bins.setValue(bins[idx + 1])
 
     def on_spinbox_roi(self):
+        pass
+
+    def on_button_set_roi(self):
         """
         Changes the roi of the camera
 
@@ -749,7 +766,7 @@ class ImageWidget(pg.ImageView, object):
             try:
                 first, last = self.parent.cam.get_num_available_images()
                 buffer_size = last - first
-            except AndorError:
+            except (AndorError, AttributeError):
                 buffer_size = 0
             self.parent.status_buffer.setText('Buffer: {}'.format(buffer_size))
 
@@ -895,6 +912,46 @@ class ImageWidget(pg.ImageView, object):
         else:
             raise IOError('VideoWriter not created. Nothing to release.')
 
+    def roiClicked(self):
+        """
+        Exact copy of parent method except doesn't show plot
+        :return:
+        """
+        showRoiPlot = False
+        if self.ui.roiBtn.isChecked():
+            self.roi.show()
+            self.ui.splitter.setSizes([self.height()*0.6, self.height()*0.4])
+            self.roiCurve.show()
+            self.roiChanged()
+        else:
+            self.roi.hide()
+            self.roiCurve.hide()
+
+        if self.hasTimeAxis():
+            mn = self.tVals.min()
+            mx = self.tVals.max()
+            self.timeLine.setBounds([mn, mx])
+            if not self.ui.roiBtn.isChecked():
+                self.ui.splitter.setSizes([self.height()-35, 35])
+        else:
+            self.timeLine.hide()
+
+        self.ui.roiPlot.setVisible(False)
+
+    def roiChanged(self):
+        """
+        Overrides parent method, only want pos, not data
+
+        :return:
+        """
+        x1, y1 = map(int, self.roi.pos())
+        dx, dy = map(int, self.roi.size())
+
+        self.parent.spinbox_x1.setValue(x1+1)
+        self.parent.spinbox_y1.setValue(y1+1)
+        self.parent.spinbox_x2.setValue(x1+dx)
+        self.parent.spinbox_y2.setValue(y1+dy)
+
 
 class BufferFrame(QtGui.QMainWindow):
     """
@@ -933,7 +990,7 @@ class BufferFrame(QtGui.QMainWindow):
         self.central_widget.setLayout(layout_frame)
         self.setCentralWidget(self.central_widget)
 
-        self.show()
+        # self.show()
 
     def create_status_bar(self):
         """
