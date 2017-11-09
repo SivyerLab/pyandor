@@ -304,12 +304,12 @@ class CentralWidget(QtGui.QWidget):
         # add to grid
         layout_grid.addWidget(x1, 0, 0)
         layout_grid.addWidget(self.spinbox_x1, 0, 1, 1, 3)
-        layout_grid.addWidget(x2, 1, 0)
-        layout_grid.addWidget(self.spinbox_x2, 1, 1, 1, 3)
-        layout_grid.addWidget(y1, 2, 0)
-        layout_grid.addWidget(self.spinbox_y1, 2, 1, 1, 3)
+        layout_grid.addWidget(y1, 1, 0)
+        layout_grid.addWidget(self.spinbox_y1, 1, 1, 1, 3)
+
+        layout_grid.addWidget(x2, 2, 0)
+        layout_grid.addWidget(self.spinbox_x2, 2, 1, 1, 3)
         layout_grid.addWidget(y2, 3, 0)
-        layout_grid.addWidget(self.spinbox_y2, 3, 1, 1, 3)
         layout_grid.addWidget(self.spinbox_y2, 3, 1, 1, 3)
 
         return layout_grid
@@ -633,7 +633,28 @@ class CentralWidget(QtGui.QWidget):
 
     def on_spinbox_roi(self):
         # TODO: make this change ROI box
-        pass
+        roi = [self.spinbox_x1.value(),
+               self.spinbox_x2.value(),
+               self.spinbox_y1.value(),
+               self.spinbox_y2.value()]
+
+        roi = list(map(int, roi))
+
+        x1, y1 = roi[0], roi[2]
+        x2, y2 = roi[1], roi[3]
+        dx, dy = x2 - x1, y2 - y1
+
+        if dx != dy:
+            m = min([dx, dy])
+            dx, dy = m, m
+
+        print(x1, y1, x2, y2)
+        print(x1, y1, dx, dy)
+        print(self.image_viewer.roi.pos(), self.image_viewer.roi.size())
+        print()
+
+        self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
+        self.image_viewer.roi.setSize((dx+1, dy+1))
 
     def on_button_set_roi(self):
         """
@@ -753,6 +774,8 @@ class ImageWidget(pg.ImageView, object):
         # timing deque
         self.deque = deque([0], maxlen=10)
         self.fps = 7
+
+        self.roi.removeHandle(1)
 
     def update(self, img_data=None):
         """
@@ -952,6 +975,13 @@ class ImageWidget(pg.ImageView, object):
         """
         x1, y1 = map(int, self.roi.pos())
         dx, dy = map(int, self.roi.size())
+
+        x1 = x1 if x1 > 0 else 0
+        y1 = y1 if y1 > 0 else 0
+
+        # if dx != dy:
+        #     m = min([dx, dy])
+        #     dx, dy = m, m
 
         self.parent.spinbox_x1.setValue(x1+1)
         self.parent.spinbox_y1.setValue(y1+1)
