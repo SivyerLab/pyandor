@@ -726,6 +726,7 @@ class ImageWidget(pg.ImageView, object):
         self.do_threshold = False
         self.thresh_value = 128
         self.do_autolevel = True
+        self.previous_size = [1024, 1024]
 
         self.flash = False
         self.out = None
@@ -760,9 +761,13 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
+
             self.setImage(img_data,
                           autoLevels=self.do_autolevel,
-                          autoHistogramRange=self.do_autolevel)
+                          autoRange=self.previous_size != img_data.shape,
+                          autoHistogramRange=self.do_autolevel
+                          )
+            self.previous_size = img_data.shape
 
             try:
                 first, last = self.parent.cam.get_num_available_images()
