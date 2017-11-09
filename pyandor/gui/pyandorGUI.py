@@ -133,7 +133,7 @@ class CentralWidget(QtGui.QWidget):
 
         if not self.connect_camera():
             import scipy as sp
-            dummy_data = sp.misc.imread("C:\Users\Alex\Desktop\grayscale_bars.png")
+            dummy_data = sp.misc.imread('grayscale_bars.png')
             dummy_data = np.dsplit(dummy_data, 4)[0]
             dummy_data.shape = (512, 512)
             self.image_viewer.update(dummy_data)
@@ -647,11 +647,6 @@ class CentralWidget(QtGui.QWidget):
         if dx != dy:
             m = min([dx, dy])
             dx, dy = m, m
-
-        print(x1, y1, x2, y2)
-        print(x1, y1, dx, dy)
-        print(self.image_viewer.roi.pos(), self.image_viewer.roi.size())
-        print()
 
         self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
         self.image_viewer.roi.setSize((dx+1, dy+1))
