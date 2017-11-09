@@ -633,6 +633,7 @@ class CentralWidget(QtGui.QWidget):
 
     def on_spinbox_roi(self):
         # TODO: make this change ROI box
+        pass
 
     def on_button_set_roi(self):
         """
