@@ -100,7 +100,12 @@ class CentralWidget(QtGui.QWidget):
 
         self.trigger_mode = 'internal'
         if HAS_U3:
-            self.d = u3.U3()
+            try:
+                self.d = u3.U3()
+            except u3.LabJackException:
+                gui_logger.warn('Labjack already in use by another program.')
+                global HAS_U3
+                HAS_U3 = False
         else:
             gui_logger.warn('If want triggering, need labjackpython and driver.')
 
@@ -251,6 +256,10 @@ class CentralWidget(QtGui.QWidget):
         self.button_set_roi = QtGui.QPushButton('Set ROI')
         self.button_set_roi.clicked.connect(self.on_button_set_roi)
         layout_control_splitter.addWidget(self.button_set_roi)
+
+        self.button_reset_roi = QtGui.QPushButton('Reset ROI')
+        self.button_reset_roi.clicked.connect(self.on_button_reset_roi)
+        layout_control_splitter.addWidget(self.button_reset_roi)
 
         layout_control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return layout_control_splitter
@@ -658,6 +667,7 @@ class CentralWidget(QtGui.QWidget):
 
         :return:
         """
+
         if self.image_viewer.to_out:
             gui_logger.warn('Cannot update binning while recording')
             self.spinbox_bins.setValue(self.bins)
@@ -666,12 +676,54 @@ class CentralWidget(QtGui.QWidget):
         self.cam_thread.pause()
         time.sleep(.3)
 
-        roi = [self.spinbox_x1.value(),
-               self.spinbox_x2.value(),
-               self.spinbox_y1.value(),
-               self.spinbox_y2.value()]
+        roi = [self.spinbox_y1.value(),
+               self.spinbox_y2.value(),
+               self.spinbox_x1.value(),
+               self.spinbox_x2.value()]
 
         roi = list(map(int, roi))
+
+        # sometimes doesn't pause in time if rapid switch
+        try:
+            self.cam.set_roi(roi)
+            self.image_viewer.roi_value = roi
+
+            self.image_viewer.roi.setPos([0, 0])
+            if self.image_viewer.ui.roiBtn.isChecked():
+                self.image_viewer.ui.roiBtn.toggle()
+
+        except AndorAcqInProgress:
+            raise
+
+        time.sleep(.1)
+
+        if self.playing:
+            self.cam_thread.unpause()
+            # need to wait for unpause, in case try to change binning again
+            while self.cam_thread.paused:
+                pass
+
+    def on_button_reset_roi(self):
+        """
+        Changes the roi of the camera
+
+        :return:
+        """
+        if self.image_viewer.ui.roiBtn.isChecked():
+            self.image_viewer.ui.roiBtn.toggle()
+
+        if self.image_viewer.to_out:
+            gui_logger.warn('Cannot update binning while recording')
+            self.spinbox_bins.setValue(self.bins)
+            return
+
+        self.cam_thread.pause()
+        time.sleep(.3)
+
+        roi = [1,
+               1024,
+               1,
+               1024]
 
         # sometimes doesn't pause in time if rapid switch
         try:
@@ -782,7 +834,7 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
-
+            print('shape', img_data.shape)
             self.setImage(img_data,
                           autoLevels=self.do_autolevel,
                           autoRange=self.previous_size != img_data.shape,
@@ -973,9 +1025,11 @@ class ImageWidget(pg.ImageView, object):
         """
         x1, y1 = map(int, self.roi.pos())
         dx, dy = map(int, self.roi.size())
+        print('dx, dy', dx, dy)
+        print()
 
-        x1 = x1 if x1 > 0 else 0
-        y1 = y1 if y1 > 0 else 0
+        # x1 = x1 if x1 > 0 else 0
+        # y1 = y1 if y1 > 0 else 0
 
         x2, y2 = x1 + dx, y1 + dy
 
@@ -983,8 +1037,8 @@ class ImageWidget(pg.ImageView, object):
         #     m = min([dx, dy])
         #     dx, dy = m, m
 
-        x1, x2, y1, y2 = self.roi_to_abs_coord([x1, x2, y1, y2])
-        print([x1, x2, y1, y2])
+        y1, y2, x1, x2 = self.roi_to_abs_coord([y1, y2, x1, x2])
+        # print([x1, x2, y1, y2])
 
         self.parent.spinbox_x1.setValue(x1)
         self.parent.spinbox_y1.setValue(y1)
