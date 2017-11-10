@@ -641,6 +641,7 @@ class CentralWidget(QtGui.QWidget):
 
     def on_spinbox_roi(self):
         """
+        Adjusts the size of the ROI on clicking spinbox buttons
 
         :return:
         """
