@@ -665,6 +665,8 @@ class CentralWidget(QtGui.QWidget):
             m = f([dx, dy])
             dx, dy = m, m
 
+        print(self.image_viewer.abs_coord_to_roi([y1, y2, x1, x2]))
+
         self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
         self.image_viewer.roi.setSize((dx+1, dy+1))
 
@@ -1081,6 +1083,19 @@ class ImageWidget(pg.ImageView, object):
                                                          self.roi_value[2],
                                                          self.roi_value[2]-1]
         return abs_coords
+
+    def abs_coord_to_roi(self, abs_coords):
+        """
+        Converts from local ROI coordinates to position in the original image
+
+        :param pos:
+        :return:
+        """
+        pos = (np.array(abs_coords) - [self.roi_value[0],
+                                      self.roi_value[0]-1,
+                                      self.roi_value[2],
+                                      self.roi_value[2]-1]) / self.parent.bins
+        return pos
 
 
 class BufferFrame(QtGui.QMainWindow):
