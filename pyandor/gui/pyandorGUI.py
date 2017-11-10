@@ -531,8 +531,6 @@ class CentralWidget(QtGui.QWidget):
         Captures a single frame and writes to file.
         """
         first, last = self.cam.get_num_available_images()
-        print()
-        print(first, last)
         img_array, size, shape, bins = self.cam.acquire_images(first+1, last)
         step = img_array.size // size
 
@@ -834,7 +832,6 @@ class ImageWidget(pg.ImageView, object):
         :param img_data: image data, if None only updates overlay
         """
         if img_data is not None:
-            print('shape', img_data.shape)
             self.setImage(img_data,
                           autoLevels=self.do_autolevel,
                           autoRange=self.previous_size != img_data.shape,
@@ -1025,8 +1022,6 @@ class ImageWidget(pg.ImageView, object):
         """
         x1, y1 = map(int, self.roi.pos())
         dx, dy = map(int, self.roi.size())
-        print('dx, dy', dx, dy)
-        print()
 
         if dx != dy:
             m = min([dx, dy])
@@ -1057,7 +1052,6 @@ class ImageWidget(pg.ImageView, object):
                                                          self.roi_value[2],
                                                          self.roi_value[2]-1]
         return abs_coords
-
 
 
 class BufferFrame(QtGui.QMainWindow):
