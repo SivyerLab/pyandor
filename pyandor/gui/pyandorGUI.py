@@ -633,23 +633,24 @@ class CentralWidget(QtGui.QWidget):
 
     def on_spinbox_roi(self):
         # TODO: make this change ROI box
-        roi = [self.spinbox_x1.value(),
-               self.spinbox_x2.value(),
-               self.spinbox_y1.value(),
-               self.spinbox_y2.value()]
-
-        roi = list(map(int, roi))
-
-        x1, y1 = roi[0], roi[2]
-        x2, y2 = roi[1], roi[3]
-        dx, dy = x2 - x1, y2 - y1
-
-        if dx != dy:
-            m = min([dx, dy])
-            dx, dy = m, m
-
-        self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
-        self.image_viewer.roi.setSize((dx+1, dy+1))
+        pass
+        # roi = [self.spinbox_x1.value(),
+        #        self.spinbox_x2.value(),
+        #        self.spinbox_y1.value(),
+        #        self.spinbox_y2.value()]
+        #
+        # roi = list(map(int, roi))
+        #
+        # x1, y1 = roi[0], roi[2]
+        # x2, y2 = roi[1], roi[3]
+        # dx, dy = x2 - x1, y2 - y1
+        #
+        # if dx != dy:
+        #     m = min([dx, dy])
+        #     dx, dy = m, m
+        #
+        # self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
+        # self.image_viewer.roi.setSize((dx+1, dy+1))
 
     def on_button_set_roi(self):
         """
@@ -675,6 +676,7 @@ class CentralWidget(QtGui.QWidget):
         # sometimes doesn't pause in time if rapid switch
         try:
             self.cam.set_roi(roi)
+            self.image_viewer.roi_value = roi
 
         except AndorAcqInProgress:
             raise
@@ -743,6 +745,7 @@ class ImageWidget(pg.ImageView, object):
         self.thresh_value = 128
         self.do_autolevel = True
         self.previous_size = [1024, 1024]
+        self.roi_value = [1, 1024, 1, 1024]
 
         self.flash = False
         self.out = None
@@ -974,14 +977,33 @@ class ImageWidget(pg.ImageView, object):
         x1 = x1 if x1 > 0 else 0
         y1 = y1 if y1 > 0 else 0
 
+        x2, y2 = x1 + dx, y1 + dy
+
         # if dx != dy:
         #     m = min([dx, dy])
         #     dx, dy = m, m
 
-        self.parent.spinbox_x1.setValue(x1+1)
-        self.parent.spinbox_y1.setValue(y1+1)
-        self.parent.spinbox_x2.setValue(x1+dx)
-        self.parent.spinbox_y2.setValue(y1+dy)
+        x1, x2, y1, y2 = self.roi_to_abs_coord([x1, x2, y1, y2])
+        print([x1, x2, y1, y2])
+
+        self.parent.spinbox_x1.setValue(x1)
+        self.parent.spinbox_y1.setValue(y1)
+        self.parent.spinbox_x2.setValue(x2)
+        self.parent.spinbox_y2.setValue(y2)
+
+    def roi_to_abs_coord(self, pos):
+        """
+        Converts from local ROI coordinates to position in the original image
+
+        :param pos:
+        :return:
+        """
+        abs_coords = np.array(pos) * self.parent.bins + [self.roi_value[0],
+                                                         self.roi_value[0]-1,
+                                                         self.roi_value[2],
+                                                         self.roi_value[2]-1]
+        return abs_coords
+
 
 
 class BufferFrame(QtGui.QMainWindow):
