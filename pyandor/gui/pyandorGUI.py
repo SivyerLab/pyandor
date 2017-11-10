@@ -97,6 +97,7 @@ class CentralWidget(QtGui.QWidget):
         self.playing = False
         self.overlay_active = False
         self.bins = 1
+        self.old_sb_roi = np.array([1, 1024, 1, 1024])
 
         self.trigger_mode = 'internal'
         if HAS_U3:
@@ -282,25 +283,25 @@ class CentralWidget(QtGui.QWidget):
         # spinboxes
         self.spinbox_x1 = QtGui.QDoubleSpinBox()
         self.spinbox_x1.setRange(1, 1024)
-        self.spinbox_x1.setSingleStep(32)
+        self.spinbox_x1.setSingleStep(10)
         self.spinbox_x1.setValue(1)
         self.spinbox_x1.setDecimals(0)
 
         self.spinbox_x2 = QtGui.QDoubleSpinBox()
         self.spinbox_x2.setRange(1, 1024)
-        self.spinbox_x2.setSingleStep(32)
+        self.spinbox_x2.setSingleStep(10)
         self.spinbox_x2.setValue(1024)
         self.spinbox_x2.setDecimals(0)
 
         self.spinbox_y1 = QtGui.QDoubleSpinBox()
         self.spinbox_y1.setRange(1, 1024)
-        self.spinbox_y1.setSingleStep(32)
+        self.spinbox_y1.setSingleStep(10)
         self.spinbox_y1.setValue(1)
         self.spinbox_y1.setDecimals(0)
 
         self.spinbox_y2 = QtGui.QDoubleSpinBox()
         self.spinbox_y2.setRange(1, 1024)
-        self.spinbox_y2.setSingleStep(32)
+        self.spinbox_y2.setSingleStep(10)
         self.spinbox_y2.setValue(1024)
         self.spinbox_y2.setDecimals(0)
 
@@ -639,25 +640,32 @@ class CentralWidget(QtGui.QWidget):
                 self.spinbox_bins.setValue(bins[idx + 1])
 
     def on_spinbox_roi(self):
-        # TODO: make this change ROI box
-        pass
-        # roi = [self.spinbox_y1.value(),
-        #        self.spinbox_y2.value(),
-        #        self.spinbox_x1.value(),
-        #        self.spinbox_x2.value()]
-        #
-        # roi = list(map(int, roi))
-        #
-        # x1, y1 = roi[2], roi[0]
-        # x2, y2 = roi[3], roi[1]
-        # dx, dy = x2 - x1, y2 - y1
-        #
-        # if dx != dy:
-        #     m = min([dx, dy])
-        #     dx, dy = m, m
-        #
-        # self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
-        # self.image_viewer.roi.setSize((dx+1, dy+1))
+        """
+
+        :return:
+        """
+        # pass
+        roi = [self.spinbox_y1.value(),
+               self.spinbox_y2.value(),
+               self.spinbox_x1.value(),
+               self.spinbox_x2.value()]
+
+        # get dir
+        pos_dir = 0 > sum(self.old_sb_roi - roi)
+
+        roi = list(map(int, roi))
+
+        x1, y1 = roi[2], roi[0]
+        x2, y2 = roi[3], roi[1]
+        dx, dy = x2 - x1, y2 - y1
+
+        if dx != dy:
+            f = max if pos_dir else min
+            m = f([dx, dy])
+            dx, dy = m, m
+
+        self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
+        self.image_viewer.roi.setSize((dx+1, dy+1))
 
     def on_button_set_roi(self):
         """
@@ -1014,7 +1022,7 @@ class ImageWidget(pg.ImageView, object):
 
         self.ui.roiPlot.setVisible(False)
 
-    def roiChanged(self):
+    def roiChanged(self, **kwargs):
         """
         Overrides parent method, only want pos, not data
 
@@ -1023,8 +1031,16 @@ class ImageWidget(pg.ImageView, object):
         x1, y1 = map(int, self.roi.pos())
         dx, dy = map(int, self.roi.size())
 
+        if 'min_max' in kwargs:
+            min_max = kwargs['min_max']
+        else:
+            min_max = 'max'
+
         if dx != dy:
-            m = min([dx, dy])
+            f = {'max': max,
+                 'min': min}[min_max]
+
+            m = f([dx, dy])
             dx, dy = m, m
             self.roi.setSize([dx, dy])
 
@@ -1035,10 +1051,22 @@ class ImageWidget(pg.ImageView, object):
         x1 = x1 if x1 > 0 else 1
         y1 = y1 if y1 > 0 else 1
 
+        self.parent.spinbox_x1.blockSignals(True)
+        self.parent.spinbox_y1.blockSignals(True)
+        self.parent.spinbox_x2.blockSignals(True)
+        self.parent.spinbox_y2.blockSignals(True)
+
         self.parent.spinbox_x1.setValue(x1)
         self.parent.spinbox_y1.setValue(y1)
         self.parent.spinbox_x2.setValue(x2)
         self.parent.spinbox_y2.setValue(y2)
+
+        self.parent.spinbox_x1.blockSignals(False)
+        self.parent.spinbox_y1.blockSignals(False)
+        self.parent.spinbox_x2.blockSignals(False)
+        self.parent.spinbox_y2.blockSignals(False)
+
+        self.parent.old_sb_roi = np.array([y1, y2, x1, x2])
 
     def roi_to_abs_coord(self, pos):
         """
