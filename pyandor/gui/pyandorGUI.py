@@ -643,15 +643,15 @@ class CentralWidget(QtGui.QWidget):
     def on_spinbox_roi(self):
         # TODO: make this change ROI box
         pass
-        # roi = [self.spinbox_x1.value(),
-        #        self.spinbox_x2.value(),
-        #        self.spinbox_y1.value(),
-        #        self.spinbox_y2.value()]
+        # roi = [self.spinbox_y1.value(),
+        #        self.spinbox_y2.value(),
+        #        self.spinbox_x1.value(),
+        #        self.spinbox_x2.value()]
         #
         # roi = list(map(int, roi))
         #
-        # x1, y1 = roi[0], roi[2]
-        # x2, y2 = roi[1], roi[3]
+        # x1, y1 = roi[2], roi[0]
+        # x2, y2 = roi[3], roi[1]
         # dx, dy = x2 - x1, y2 - y1
         #
         # if dx != dy:
@@ -1028,17 +1028,17 @@ class ImageWidget(pg.ImageView, object):
         print('dx, dy', dx, dy)
         print()
 
-        # x1 = x1 if x1 > 0 else 0
-        # y1 = y1 if y1 > 0 else 0
+        if dx != dy:
+            m = min([dx, dy])
+            dx, dy = m, m
+            self.roi.setSize([dx, dy])
 
         x2, y2 = x1 + dx, y1 + dy
 
-        # if dx != dy:
-        #     m = min([dx, dy])
-        #     dx, dy = m, m
-
         y1, y2, x1, x2 = self.roi_to_abs_coord([y1, y2, x1, x2])
-        # print([x1, x2, y1, y2])
+
+        x1 = x1 if x1 > 0 else 1
+        y1 = y1 if y1 > 0 else 1
 
         self.parent.spinbox_x1.setValue(x1)
         self.parent.spinbox_y1.setValue(y1)
