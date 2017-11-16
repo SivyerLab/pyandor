@@ -665,7 +665,7 @@ class CentralWidget(QtGui.QWidget):
             m = f([dx, dy])
             dx, dy = m, m
 
-        print(self.image_viewer.abs_coord_to_roi([y1, y2, x1, x2]))
+        print(self.image_viewer.abs_coord_to_roi([y1, y2-y1, x1, x2-x1]))
 
         self.image_viewer.roi.setPos((x1-1, y1-1), update=False)
         self.image_viewer.roi.setSize((dx+1, dy+1))
