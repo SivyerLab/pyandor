@@ -531,6 +531,10 @@ class CentralWidget(QtGui.QWidget):
         """
         Captures a single frame and writes to file.
         """
+        if not self.connected:
+            gui_logger.warn('Not connected to camera.')
+            return
+
         first, last = self.cam.get_num_available_images()
         img_array, size, shape, bins = self.cam.acquire_images(first+1, last)
         step = img_array.size // size
@@ -600,6 +604,11 @@ class CentralWidget(QtGui.QWidget):
         """
         if self.image_viewer.to_out:
             gui_logger.warn('Cannot update binning while recording')
+            self.spinbox_bins.setValue(self.bins)
+            return
+
+        if not self.connected:
+            gui_logger.warn('Not connected to camera.')
             self.spinbox_bins.setValue(self.bins)
             return
 
@@ -676,9 +685,13 @@ class CentralWidget(QtGui.QWidget):
 
         :return:
         """
-
         if self.image_viewer.to_out:
             gui_logger.warn('Cannot update binning while recording')
+            self.spinbox_bins.setValue(self.bins)
+            return
+
+        if not self.connected:
+            gui_logger.warn('Not connected to camera.')
             self.spinbox_bins.setValue(self.bins)
             return
 
@@ -718,13 +731,17 @@ class CentralWidget(QtGui.QWidget):
 
         :return:
         """
-        if self.image_viewer.ui.roiBtn.isChecked():
-            self.image_viewer.ui.roiBtn.toggle()
-
         if self.image_viewer.to_out:
             gui_logger.warn('Cannot update binning while recording')
             self.spinbox_bins.setValue(self.bins)
             return
+
+        if not self.connected:
+            gui_logger.warn('Not connected to camera.')
+            return
+
+        if self.image_viewer.ui.roiBtn.isChecked():
+            self.image_viewer.ui.roiBtn.toggle()
 
         self.cam_thread.pause()
         time.sleep(.3)
@@ -738,6 +755,8 @@ class CentralWidget(QtGui.QWidget):
         try:
             self.cam.set_roi(roi)
             self.image_viewer.roi_value = roi
+            self.bins = 1
+            self.spinbox_bins.setValue(self.bins)
 
         except AndorAcqInProgress:
             raise
