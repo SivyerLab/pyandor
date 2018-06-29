@@ -4,6 +4,9 @@ import logging
 import sys
 import time
 from collections import deque
+from pathlib import Path
+import datetime
+import functools
 
 import cv2
 import numpy as np
@@ -98,6 +101,9 @@ class CentralWidget(QtGui.QWidget):
         self.overlay_active = False
         self.bins = 1
         self.old_sb_roi = np.array([1, 1024, 1, 1024])
+        self.timelapse_timer = None
+        self.timelapse_duration = None
+        self.f = None
 
         self.trigger_mode = 'internal'
         if HAS_U3:
@@ -216,8 +222,8 @@ class CentralWidget(QtGui.QWidget):
         self.button_screenshot = QtGui.QPushButton('Screenshot')
         self.button_screenshot.clicked.connect(self.on_button_screenshot)
 
-        self.button_test = QtGui.QPushButton('Test')
-        self.button_test.clicked.connect(self.on_button_test)
+        self.button_view_buffer = QtGui.QPushButton('View Buffer')
+        self.button_view_buffer.clicked.connect(self.on_button_view_buffer)
 
         self.spinbox_exposure = QtGui.QDoubleSpinBox()
         self.spinbox_exposure.setRange(0, 10000)
@@ -251,7 +257,7 @@ class CentralWidget(QtGui.QWidget):
         layout_control_splitter.addWidget(self.spinbox_exposure)
         layout_control_splitter.addWidget(self.spinbox_bins)
         layout_control_splitter.addWidget(self.button_screenshot)
-        layout_control_splitter.addWidget(self.button_test)
+        layout_control_splitter.addWidget(self.button_view_buffer)
         layout_control_splitter.addLayout(self.setup_roi_controls())
 
         self.button_set_roi = QtGui.QPushButton('Set ROI')
@@ -261,6 +267,43 @@ class CentralWidget(QtGui.QWidget):
         self.button_reset_roi = QtGui.QPushButton('Reset ROI')
         self.button_reset_roi.clicked.connect(self.on_button_reset_roi)
         layout_control_splitter.addWidget(self.button_reset_roi)
+
+        self.spinbox_interval_secs = QtGui.QDoubleSpinBox()
+        self.spinbox_interval_secs.setRange(0, 59)
+        self.spinbox_interval_secs.setSingleStep(1)
+        self.spinbox_interval_secs.setValue(0)
+        self.spinbox_interval_secs.setDecimals(0)
+
+        self.spinbox_interval_minutes = QtGui.QDoubleSpinBox()
+        self.spinbox_interval_minutes.setRange(0, 14400)  # max 10 days; arbitrary
+        self.spinbox_interval_minutes.setSingleStep(1)
+        self.spinbox_interval_minutes.setValue(0)
+        self.spinbox_interval_minutes.setDecimals(0)
+
+        layout_spinbox_interval = QtGui.QHBoxLayout()
+        layout_spinbox_interval.addWidget(self.spinbox_interval_minutes)
+        layout_spinbox_interval.addWidget(self.spinbox_interval_secs)
+        layout_control_splitter.addLayout(layout_spinbox_interval)
+
+        label_timelapse = QtGui.QLabel('minutes : seconds')
+        label_timelapse.setAlignment(QtCore.Qt.AlignCenter)
+        layout_control_splitter.addWidget(label_timelapse)
+
+        self.spinbox_duration_hours = QtGui.QDoubleSpinBox()
+        self.spinbox_duration_hours.setRange(0, 14400)  # max 10 days; arbitrary
+        self.spinbox_duration_hours.setSingleStep(1)
+        self.spinbox_duration_hours.setValue(0)
+        self.spinbox_duration_hours.setDecimals(4)
+        layout_control_splitter.addWidget(self.spinbox_duration_hours)
+
+        label_duration = QtGui.QLabel('duration (hours)')
+        label_duration.setAlignment(QtCore.Qt.AlignCenter)
+        layout_control_splitter.addWidget(label_duration)
+
+        self.button_timelapse = QtGui.QPushButton('Timelapse')
+        self.button_timelapse.setCheckable(True)
+        self.button_timelapse.clicked.connect(self.on_button_timelapse)
+        layout_control_splitter.addWidget(self.button_timelapse)
 
         layout_control_splitter.setAlignment(QtCore.Qt.AlignTop)
         return layout_control_splitter
@@ -527,7 +570,7 @@ class CentralWidget(QtGui.QWidget):
             return
         self.image_viewer.write_screenshot(path=filename)
 
-    def on_button_test(self):
+    def on_button_view_buffer(self):
         """
         Captures a single frame and writes to file.
         """
@@ -793,6 +836,99 @@ class CentralWidget(QtGui.QWidget):
         if self.overlay_active:
             self.update_overlay()
 
+    def on_button_timelapse(self):
+        """
+        Initiates recording a timelapse.
+        """
+        checked = self.button_timelapse.isChecked()
+
+        if checked:
+            filename = str(QtGui.QFileDialog.getSaveFileName(self, 'Timelapse save', './', selectedFilter='*.png'))
+            if not filename:
+                if self.button_timelapse.isChecked():
+                    self.button_timelapse.toggle()
+                return
+
+            p = Path(filename)
+            timelapse_savedir = p.parent
+            timelapse_root = p.stem
+
+            self.timelapse_init(timelapse_savedir, timelapse_root)
+
+        else:
+            self.timelapse_stop()
+
+    def timelapse_init(self, savedir, name_root):
+        """
+        Starts the timelapse
+        """
+        if self.timelapse_timer is not None:
+            return
+
+        if self.playing:
+            self.on_button_start_pause()
+
+        if not Path(savedir).exists():
+            Path(savedir).mkdir(parents=True, exist_ok=False)
+
+        # timer for flashing overlay
+        self.timelapse_timer = QtCore.QTimer(self)
+        self.timelapse_timer.timeout.connect(functools.partial(self.timelapse_capture, savedir, name_root))
+
+        timer_interval = self.spinbox_interval_minutes.value() * 60000 + self.spinbox_interval_secs.value() * 1000
+
+        # timer for stopping timelapse
+        self.timelapse_duration = QtCore.QTimer(self)
+        self.timelapse_duration.timeout.connect(self.timelapse_stop)
+
+        duration = self.spinbox_duration_hours.value() * 3e6 + timer_interval / 2
+
+        # start timers
+        self.timelapse_timer.start(timer_interval)
+        self.timelapse_duration.start(duration)
+
+    def timelapse_stop(self):
+        """
+        Stops the timelapse
+        """
+        gui_logger.info('Stopping timelapse')
+        if self.timelapse_timer is not None:
+            self.timelapse_timer.stop()
+            self.timelapse_timer = None
+
+            self.timelapse_duration.stop()
+            self.timelapse_duration = None
+
+        if self.button_timelapse.isChecked():
+            self.button_timelapse.toggle()
+
+        try:
+            self.cam_thread.image_signal.disconnect(self.f)
+        except:
+            raise
+
+    def timelapse_capture(self, savedir, name_root):
+        """
+        Captures the timelapse image.
+        """
+        gui_logger.info('Capturing timelapse image')
+        date_string = datetime.datetime.now().strftime('%Y_%m_%d_%H%M%S')
+        self.on_button_single()
+        save_name = Path(savedir) / (name_root + '_' + date_string + '.png')
+
+        # need to wait for image to be captured before writing
+        if self.f is not None:
+            self.cam_thread.image_signal.disconnect(self.f)
+        self.f = functools.partial(self.delayed_screenshot, str(save_name))
+        self.cam_thread.image_signal.connect(self.f)
+
+    def delayed_screenshot(self, save_name):
+        """
+        Does a delayed screenshot
+        """
+        f = functools.partial(self.image_viewer.write_screenshot, str(save_name))
+        QtCore.QTimer.singleShot(self.spinbox_exposure.value() * 2, f)
+
     def shutdown_camera(self):
         """
         Intercept close event to properly shut down camera and thread.
@@ -880,6 +1016,10 @@ class ImageWidget(pg.ImageView, object):
             self.deque.append(t)
             self.fps = np.mean(np.diff(self.deque))**-1
             self.parent.status_fps.setText('FPS: {:.2f} fps'.format(self.fps))
+
+            # if self.parent.timelapse_timer is not None:
+            #     r = self.parent.timelapse_timer.remainingTime()
+            #     print(r)
 
             if self.to_out:
                 self.write_out(img_data)
