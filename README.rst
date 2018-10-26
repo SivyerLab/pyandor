@@ -28,8 +28,8 @@ Optionally:
 Installation
 ------------
 
-conda install -c menpo opencv
-conda install -y pyqt=4 pyqtgraph numpy scipy pillow
+``conda install -c menpo opencv``
+``conda install -y pyqt=4 pyqtgraph numpy scipy pillow``
 
 Credits
 -------
